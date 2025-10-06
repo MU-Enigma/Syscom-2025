@@ -1,15 +1,15 @@
-# 🧩 Task 6 - Simple Calculator
+#  Task 6 - Simple Calculator
 
-### 🧠 Concept
+###  Concept
 Perform basic arithmetic operations using user input and case statements.
 
-### 🧪 How to Run
+###  How to Run
 ```bash
 chmod +x calculator.sh
 ./calculator.sh
 ```
 
-### 🖥️ Example Output
+###  Example Output
 ```
 Enter first number:
 4
