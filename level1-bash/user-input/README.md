@@ -1,15 +1,15 @@
-# 🧩 Task 3 - User Input
+#  Task 3 - User Input
 
-### 🧠 Concept
+###  Concept
 Learn how to take user input using the `read` command.
 
-### 🧪 How to Run
+###  How to Run
 ```bash
 chmod +x user-input.sh
 ./user-input.sh
 ```
 
-### 🖥️ Example Output
+###  Example Output
 ```
 What’s your name?
 Ankita
