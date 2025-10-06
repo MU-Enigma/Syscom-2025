@@ -62,7 +62,7 @@ Here, you’ll fix bugs, optimize commands, and improve CLI tools related to com
 - Improve help menu or command flags  
 
 **Tags:** `level3`, `bug`, `feature`, `general`  
-**Directory:** `src/`  
+**Directory:** `level3-vcs/`  
 **Goal:** Learn debugging, structured contributions, and the open-source issue workflow.
 
 ---
@@ -80,7 +80,7 @@ Think like a maintainer — open meaningful issues, suggest improvements, and im
 - Improve error handling or logging  
 - Propose UI/UX improvements for CLI messages  
 
-**Directory:** `src/`  
+**Directory:** `level4-vcs/`  
 **Goal:** Learn end-to-end open-source contribution — from identifying problems to implementing solutions.
 
 ---
@@ -96,8 +96,8 @@ Click the **Fork** button in the top-right corner of this page to create a copy 
 Bring your fork to your local machine:
 
 ```bash
-git clone https://github.com/<your-username>/HacktoberFest25_Bash-VCS.git
-cd HacktoberFest25_Bash-VCS
+git clone https://github.com/<your-username>/Syscom.git
+cd Syscom
 ```
 
 ### 3. Create a new branch
@@ -114,7 +114,7 @@ git checkout -b my-branch-name
 ### 5. Stage and commit
 ```bash
 git add .
-git commit -m "Added rock-paper-scissors bash game"
+git commit -m "Added tic-tac-toe bash game"
 ```
 
 ### 6. Push and open a PR
@@ -130,7 +130,7 @@ Then go to your fork → click **“Compare & pull request”**, and describe yo
 - Use meaningful commit messages.  
 - Before starting new work, always sync your fork:
 ```bash
-git remote add upstream https://github.com/<maintainer-username>/HacktoberFest25_Bash-VCS.git
+git remote add upstream https://github.com/<maintainer-username>/Syscom.git
 git fetch upstream
 git merge upstream/main
 ```
