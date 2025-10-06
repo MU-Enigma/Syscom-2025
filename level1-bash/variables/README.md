@@ -1,15 +1,15 @@
-# 🧩 Task 2 - Variables
+#  Task 2 - Variables
 
-### 🧠 Concept
+###  Concept
 Learn how to store and use variables in Bash.
 
-### 🧪 How to Run
+###  How to Run
 ```bash
 chmod +x variables.sh
 ./variables.sh
 ```
 
-### 🖥️ Output
+###  Output
 ```
 Hello, Ankita!
 ```
