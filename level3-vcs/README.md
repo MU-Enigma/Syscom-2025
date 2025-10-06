@@ -161,7 +161,7 @@ Display the commit history for the current branch.
 ---
 
 **Directory:** `level3-vcs/`
-**Main file:** `libuwuvc.py`
+**Main file:** `vcs.py`
 **Goal:** Implement Git-like functionality and understand the fundamentals of version control.
 
 ---
