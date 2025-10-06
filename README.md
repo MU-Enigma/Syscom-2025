@@ -48,11 +48,11 @@ It’s a fun way to improve your scripting logic while still staying within the 
 
 ---
 
-## Level 3: Working on Issues in a Custom Version Control System
+## Level 3: Working on Issues in a Version Control System
 
 **Goal:** Contribute to a real codebase and understand how Git-like tools are built.  
 
-You’ll work on **open issues** in a simplified **Version Control System (VCS)** built for learning.  
+You’ll work on **issues** in a simplified **Version Control System (VCS)** built for learning.  
 Here, you’ll fix bugs, optimize commands, and improve CLI tools related to commits, branching, or file tracking.
 
 **Example Issues:**
@@ -69,8 +69,6 @@ Here, you’ll fix bugs, optimize commands, and improve CLI tools related to com
 
 ## Level 4: Finding and Fixing Issues in the VCS
 
-**Goal:** Become a maintainer-in-training.  
-
 Here, you’ll explore the VCS source code, identify new issues, and propose fixes or enhancements.  
 Think like a maintainer — open meaningful issues, suggest improvements, and implement them.
 
@@ -80,7 +78,7 @@ Think like a maintainer — open meaningful issues, suggest improvements, and im
 - Improve error handling or logging  
 - Propose UI/UX improvements for CLI messages  
 
-**Directory:** `level4-vcs/`  
+**Directory:** `level4-advanced/`  
 **Goal:** Learn end-to-end open-source contribution — from identifying problems to implementing solutions.
 
 ---
