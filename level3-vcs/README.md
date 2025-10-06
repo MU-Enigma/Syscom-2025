@@ -6,11 +6,13 @@ Your goal is to extend its functionality, add new commands, and make it behave m
 
 This level is designed to give you hands-on experience with how Git actually works under the hood — how commits, trees, and objects are structured and tracked.
 
+PS: Keep in mind that our code isn't perfect.
+
 ---
 
 ##  Project Overview
 
-The provided code (`vcs.py`) already contains the foundational structure for:
+The provided code (`vcs.py`) already contains the foundational structure (again, not perfect) for:
 
 * Repositories and configuration
 * Blob, tree, and commit objects
@@ -163,6 +165,8 @@ Display the commit history for the current branch.
 **Directory:** `level3-vcs/`
 **Main file:** `vcs.py`
 **Goal:** Implement Git-like functionality and understand the fundamentals of version control.
+
+## Final PSA: The provided code and bug fixes aren't perfect, and there might be user errors on our part too. We're hoping that this will be a great learning experience for both you and us.
 
 ---
 
