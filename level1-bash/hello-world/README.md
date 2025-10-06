@@ -1,15 +1,15 @@
-# 🧩 Task 1 - Hello World
+#  Task 1 - Hello World
 
-### 🧠 Concept
+###  Concept
 The most basic Bash script that prints “Hello, World!” to the terminal.
 
-### 🧪 How to Run
+###  How to Run
 ```bash
 chmod +x hello-world.sh
 ./hello-world.sh
 ```
 
-### 🖥️ Output
+###  Output
 ```
 Hello, World!
 ```
