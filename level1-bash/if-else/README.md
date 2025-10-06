@@ -1,6 +1,6 @@
-# 🧩 Task  - If Else
+#  Task  - If Else
 
-### 🧠 Concept
+###  Concept
 Understand conditional logic in Bash using `if`, `else`, and comparison operators.
 
 ###  How to Run
