@@ -1,15 +1,15 @@
-# 🧩 Task 5 - Loops
+#  Task 5 - Loops
 
-### 🧠 Concept
+###  Concept
 Learn how to use loops in Bash.
 
-### 🧪 How to Run
+###  How to Run
 ```bash
 chmod +x loops.sh
 ./loops.sh
 ```
 
-### 🖥️ Example Output
+###  Example Output
 ```
 Count: 1
 Count: 2
