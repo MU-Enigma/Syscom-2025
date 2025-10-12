@@ -31,6 +31,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == "rev-parse"   : cmd_rev_parse(args)
     elif args.command == "rm"          : cmd_rm(args)
     elif args.command == "show-ref"    : cmd_show_ref(args)
+    elif args.command == "status"      : cmd_status(args)
     elif args.command == "tag"         : cmd_tag(args)
 
 class GitRepository(object):
@@ -667,3 +668,24 @@ class GitIndexEntry(object):
     """Length of the name if < 0xFFF (yes, three Fs), -1 otherwise"""
 
     name = None
+
+# Simple status command
+argsp = argsubparsers.add_parser("status", help="Show the working tree status")
+
+def cmd_status(args):
+    repo = repo_find()
+    
+    files = []
+    for item in os.listdir("."):
+        if os.path.isfile(item) and item != ".git":
+            files.append(item)
+    
+    print("On branch master")
+    print()
+    
+    if files:
+        print("Untracked files:")
+        for file in files:
+            print("        " + file)
+    else:
+        print("nothing to commit, working tree clean")
