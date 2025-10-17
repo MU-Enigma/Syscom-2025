@@ -1,2 +1,1 @@
-cmhod +x helloworld.sh
-./helloworld.sh
+echo "Hello, World!"
