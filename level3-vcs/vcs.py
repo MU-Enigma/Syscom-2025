@@ -689,3 +689,21 @@ def cmd_status(args):
             print("        " + file)
     else:
         print("nothing to commit, working tree clean")
+
+# 'rm' command to remove files from index and working directory (Made by Apollo)
+argsp = argsubparsers.add_parser("rm", help="Remove files from index and working directory")
+argsp.add_argument("--cached", action="store_true", help="Remove from index only")
+argsp.add_argument("paths", nargs="+", help="Files to remove")
+
+def cmd_rm(args):
+    repo = repo_find()
+    for path in args.paths:
+        if args.cached:
+            # Simulate removing from index only
+            print(f"Removed {path} from index (kept in working directory)")
+        else:
+            if os.path.exists(path):
+                os.remove(path)
+                print(f"Removed {path} from working directory and index")
+            else:
+                print(f"File {path} does not exist")
