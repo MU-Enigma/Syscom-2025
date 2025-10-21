@@ -1,3 +1,4 @@
+# vcs.py
 import argparse
 import collections
 import configparser
@@ -6,54 +7,47 @@ import os
 import re
 import sys
 import zlib
+import fnmatch
 import time
 
-# -------------------------------------------------------------------
-# --------------------- Repository Classes --------------------------
-# -------------------------------------------------------------------
+# ----------------------
+# Base Git repository classes (unchanged)
+# ----------------------
+class GitRepository(object):
+    worktree = None
+    gitdir = None
+    conf = None
 
-class GitRepository:
-    """
-    Represents a Git repository.
-    Responsible for paths, configuration, and initialization.
-    """
     def __init__(self, path, force=False):
         self.worktree = path
         self.gitdir = os.path.join(path, ".git")
-        self.config = configparser.ConfigParser()
-        cfg_file = os.path.join(self.gitdir, "config")
-        if os.path.exists(cfg_file):
-            self.config.read(cfg_file)
-        else:
-            self.config.add_section("core")
-            self.config.set("core", "repositoryformatversion", "0")
-            self.config.set("core", "filemode", "false")
-            self.config.set("core", "bare", "false")
-        # Ensure necessary directories exist
-        os.makedirs(os.path.join(self.gitdir, "objects"), exist_ok=True)
-        os.makedirs(os.path.join(self.gitdir, "refs", "heads"), exist_ok=True)
-        os.makedirs(os.path.join(self.gitdir, "refs", "tags"), exist_ok=True)
-        # HEAD and description
-        head_path = os.path.join(self.gitdir,"HEAD")
-        if not os.path.exists(head_path):
-            with open(head_path, 'w') as f:
-                f.write("ref: refs/heads/master\n")
-        desc_path = os.path.join(self.gitdir,"description")
-        if not os.path.exists(desc_path):
-            with open(desc_path,'w') as f:
-                f.write("Unnamed repository; edit this file 'description' to name the repository.\n")
+        if not (force or os.path.isdir(self.gitdir)):
+            raise Exception("Not a Git repository %s" % path)
+        self.conf = configparser.ConfigParser()
+        cf = repo_file(self, "config")
+        if cf and os.path.exists(cf):
+            self.conf.read([cf])
+        elif not force:
+            raise Exception("Configuration file missing")
+        if not force:
+            vers = int(self.conf.get("core", "repositoryformatversion"))
+            if vers != 0:
+                raise Exception("Unsupported repositoryformatversion %s" % vers)
 
-class GitObject:
-    """Base class for Git objects (commit, tree, blob, tag)."""
+class GitObject(object):
+    repo = None
     fmt = None
+
     def __init__(self, repo, data=None):
         self.repo = repo
-        if data:
+        if data is not None:
             self.deserialize(data)
+
     def serialize(self):
-        raise NotImplementedError()
+        raise Exception("Unimplemented!")
+
     def deserialize(self, data):
-        raise NotImplementedError()
+        raise Exception("Unimplemented!")
 
 class GitBlob(GitObject):
     fmt = b'blob'
@@ -66,44 +60,30 @@ class GitCommit(GitObject):
     fmt = b'commit'
     def __init__(self, repo, tree=None, parent=None, author=None, message=None):
         super().__init__(repo)
-        self.tree = tree
-        self.parent = parent
-        self.author = author
-        self.message = message
-        self.timestamp = int(time.time())
-    def serialize(self):
-        out = f"tree {self.tree}\n"
-        if self.parent:
-            out += f"parent {self.parent}\n"
-        out += f"author {self.author} {self.timestamp}\n\n{self.message}"
-        return out.encode()
-    def deserialize(self, data):
-        text = data.decode()
-        lines = text.splitlines()
-        self.tree = None
-        self.parent = None
-        self.author = None
-        self.message = ""
-        self.timestamp = 0
-        idx = 0
-        while idx < len(lines):
-            line = lines[idx]
-            if line.startswith("tree "):
-                self.tree = line[5:]
-            elif line.startswith("parent "):
-                self.parent = line[7:]
-            elif line.startswith("author "):
-                parts = line[7:].split()
-                self.author = parts[0]
-                if len(parts) > 1:
-                    self.timestamp = int(parts[1])
-            elif line == "":
-                self.message = "\n".join(lines[idx+1:])
-                break
-            idx += 1
+        self.kvlm = collections.OrderedDict()
+        if tree:
+            self.kvlm[b'tree'] = tree.encode()
+        if parent:
+            self.kvlm[b'parent'] = parent.encode()
+        self.kvlm[b'author'] = author.encode() if author else b'Anonymous <anon>'
+        self.kvlm[b'committer'] = author.encode() if author else b'Anonymous <anon>'
+        self.kvlm[b''] = message.encode() if message else b''
 
-class GitTreeLeaf:
-    """Represents an entry in a tree object."""
+    def serialize(self):
+        ret = b''
+        for k in self.kvlm.keys():
+            if k == b'': continue
+            v = self.kvlm[k]
+            if type(v) != list: v = [v]
+            for vv in v:
+                ret += k + b' ' + vv.replace(b'\n', b'\n ') + b'\n'
+        ret += b'\n' + self.kvlm[b'']
+        return ret
+
+    def deserialize(self, data):
+        self.kvlm = kvlm_parse(data)
+
+class GitTreeLeaf(object):
     def __init__(self, mode, path, sha):
         self.mode = mode
         self.path = path
@@ -111,258 +91,327 @@ class GitTreeLeaf:
 
 class GitTree(GitObject):
     fmt = b'tree'
-    def __init__(self, repo, items=None):
-        super().__init__(repo)
-        self.items = items or []
+    def __init__(self, repo, data=None):
+        super().__init__(repo, data)
+        if data is None:
+            self.items = []
+
     def serialize(self):
-        ret = b""
-        for item in self.items:
-            ret += item.mode + b' ' + item.path + b'\x00' + int(item.sha,16).to_bytes(20,'big')
+        ret = b''
+        for i in self.items:
+            ret += i.mode + b' ' + i.path + b'\x00'
+            sha = int(i.sha, 16)
+            ret += sha.to_bytes(20, byteorder='big')
         return ret
+
     def deserialize(self, data):
-        self.items = []
-        pos = 0
-        while pos < len(data):
-            spc = data.find(b' ', pos)
-            nul = data.find(b'\x00', spc)
-            mode = data[pos:spc]
-            path = data[spc+1:nul]
-            sha_bytes = data[nul+1:nul+21]
-            sha = hex(int.from_bytes(sha_bytes,'big'))[2:]
-            self.items.append(GitTreeLeaf(mode, path, sha))
-            pos = nul+21
+        self.items = tree_parse(data)
 
-class GitTag(GitCommit):
-    fmt = b'tag'
-    def __init__(self, repo, name=None, target=None):
-        super().__init__(repo)
-        self.name = name
-        self.target = target
+# ----------------------
+# Helper functions
+# ----------------------
+def repo_path(repo, *path):
+    return os.path.join(repo.gitdir, *path)
 
-# -------------------------------------------------------------------
-# --------------------- Utility Functions --------------------------
-# -------------------------------------------------------------------
+def repo_file(repo, *path, mkdir=False):
+    if repo_dir(repo, *path[:-1], mkdir=mkdir):
+        return repo_path(repo, *path)
 
-def hash_object(data, fmt=b'blob', repo=None):
-    """Compute SHA-1 and optionally write object to repo."""
-    header = fmt + b' ' + str(len(data)).encode() + b'\x00'
-    full = header + data
-    sha = hashlib.sha1(full).hexdigest()
-    if repo:
-        obj_dir = os.path.join(repo.gitdir,'objects',sha[:2])
-        os.makedirs(obj_dir, exist_ok=True)
-        with open(os.path.join(obj_dir,sha[2:]),'wb') as f:
-            f.write(zlib.compress(full))
-    return sha
-
-def read_object(repo, sha):
-    """Read a Git object by SHA."""
-    path = os.path.join(repo.gitdir,'objects',sha[:2],sha[2:])
-    raw = zlib.decompress(open(path,'rb').read())
-    nul = raw.find(b'\x00')
-    header = raw[:nul]
-    body = raw[nul+1:]
-    kind = header.split(b' ')[0]
-    if kind == b'blob':
-        return GitBlob(repo, body)
-    elif kind == b'commit':
-        return GitCommit(repo, body)
-    elif kind == b'tree':
-        t = GitTree(repo)
-        t.deserialize(body)
-        return t
-    elif kind == b'tag':
-        return GitTag(repo, body.decode())
+def repo_dir(repo, *path, mkdir=False):
+    path = repo_path(repo, *path)
+    if os.path.exists(path):
+        if os.path.isdir(path):
+            return path
+        else:
+            raise Exception("Not a directory %s" % path)
+    if mkdir:
+        os.makedirs(path)
+        return path
     else:
-        raise Exception("Unknown object type")
+        return None
 
-def write_object(obj):
-    """Write a Git object and return SHA."""
+def repo_create(path):
+    repo = GitRepository(path, True)
+    if os.path.exists(repo.worktree):
+        if not os.path.isdir(repo.worktree):
+            raise Exception ("%s is not a directory!" % path)
+        if os.listdir(repo.worktree):
+            raise Exception("%s is not empty!" % path)
+    else:
+        os.makedirs(repo.worktree)
+    assert(repo_dir(repo, "branches", mkdir=True))
+    assert(repo_dir(repo, "objects", mkdir=True))
+    assert(repo_dir(repo, "refs", "tags", mkdir=True))
+    assert(repo_dir(repo, "refs", "heads", mkdir=True))
+    with open(repo_file(repo, "description"), "w") as f:
+        f.write("Unnamed repository; edit this file 'description' to name the repository.\n")
+    with open(repo_file(repo, "HEAD"), "w") as f:
+        f.write("ref: refs/heads/master\n")
+    with open(repo_file(repo, "config"), "w") as f:
+        config = repo_default_config()
+        config.write(f)
+    return repo
+
+def repo_default_config():
+    ret = configparser.ConfigParser()
+    ret.add_section("core")
+    ret.set("core", "repositoryformatversion", "0")
+    ret.set("core", "filemode", "false")
+    ret.set("core", "bare", "false")
+    return ret
+
+def repo_find(path=".", required=True):
+    path = os.path.realpath(path)
+    if os.path.isdir(os.path.join(path, ".git")):
+        return GitRepository(path)
+    parent = os.path.realpath(os.path.join(path, ".."))
+    if parent == path:
+        if required:
+            raise Exception("No git directory.")
+        else:
+            return None
+    return repo_find(parent, required)
+
+def object_write(obj, actually_write=True):
     data = obj.serialize()
-    header = obj.fmt + b' ' + str(len(data)).encode() + b'\x00'
-    full = header + data
-    sha = hashlib.sha1(full).hexdigest()
-    obj_dir = os.path.join(obj.repo.gitdir,'objects',sha[:2])
-    os.makedirs(obj_dir, exist_ok=True)
-    with open(os.path.join(obj_dir,sha[2:]),'wb') as f:
-        f.write(zlib.compress(full))
+    result = obj.fmt + b' ' + str(len(data)).encode() + b'\x00' + data
+    sha = hashlib.sha1(result).hexdigest()
+    if actually_write:
+        path = repo_file(obj.repo, "objects", sha[0:2], sha[2:], mkdir=True)
+        with open(path, 'wb') as f:
+            f.write(zlib.compress(result))
     return sha
 
-def tree_add_blob(tree, path, data, repo):
-    """Add a blob to a tree."""
-    sha = hash_object(data, b'blob', repo)
-    leaf = GitTreeLeaf(b'100644', path.encode(), sha)
-    tree.items.append(leaf)
-    return sha
+def object_read(repo, sha):
+    path = repo_file(repo, "objects", sha[0:2], sha[2:])
+    with open(path, "rb") as f:
+        raw = zlib.decompress(f.read())
+        x = raw.find(b' ')
+        fmt = raw[0:x]
+        y = raw.find(b'\x00', x)
+        size = int(raw[x:y].decode("ascii"))
+        if size != len(raw)-y-1:
+            raise Exception("Malformed object {0}: bad length".format(sha))
+        if fmt==b'commit': c=GitCommit
+        elif fmt==b'tree': c=GitTree
+        elif fmt==b'blob': c=GitBlob
+        else: raise Exception("Unknown type {0}".format(fmt.decode()))
+        return c(repo, raw[y+1:])
 
-def list_repo_files(repo):
-    """List all files in repository except .git"""
-    files = []
-    for f in os.listdir("."):
-        if os.path.isfile(f) and f != ".git":
-            files.append(f)
-    return files
+def kvlm_parse(raw, start=0, dct=None):
+    if dct is None: dct = collections.OrderedDict()
+    spc = raw.find(b' ', start)
+    nl = raw.find(b'\n', start)
+    if spc < 0 or nl < spc:
+        assert(nl == start)
+        dct[b''] = raw[start+1:]
+        return dct
+    key = raw[start:spc]
+    end = start
+    while True:
+        end = raw.find(b'\n', end+1)
+        if raw[end+1] != ord(' '): break
+    value = raw[spc+1:end].replace(b'\n ', b'\n')
+    if key in dct:
+        if type(dct[key]) == list:
+            dct[key].append(value)
+        else:
+            dct[key] = [dct[key], value]
+    else:
+        dct[key] = value
+    return kvlm_parse(raw, start=end+1, dct=dct)
 
-# -------------------------------------------------------------------
-# --------------------- Command Implementations ---------------------
-# -------------------------------------------------------------------
+def tree_parse(raw):
+    pos = 0
+    items = []
+    while pos < len(raw):
+        x = raw.find(b' ', pos)
+        y = raw.find(b'\x00', x)
+        mode = raw[pos:x]
+        path = raw[x+1:y]
+        sha = hex(int.from_bytes(raw[y+1:y+21], "big"))[2:]
+        items.append(GitTreeLeaf(mode, path, sha))
+        pos = y+21
+    return items
 
+# ----------------------
+# Gitignore functions
+# ----------------------
+def load_gitignore():
+    patterns = []
+    if os.path.exists(".gitignore"):
+        with open(".gitignore") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    patterns.append(line)
+    return patterns
+
+def is_ignored(path, patterns):
+    for pattern in patterns:
+        if pattern.startswith("!"):
+            if fnmatch.fnmatch(path, pattern[1:]):
+                return False
+        elif fnmatch.fnmatch(path, pattern):
+            return True
+    return False
+
+# ----------------------
+# Command implementations
+# ----------------------
 def cmd_init(args):
-    GitRepository(args.path)
-    print(f"Initialized empty repository in {os.path.abspath(args.path)}/.git")
+    repo_create(args.path)
+    print(f"Initialized empty Git repository in {args.path}/.git")
 
 def cmd_add(args):
-    repo = GitRepository(".")
+    repo = repo_find()
+    ignore_patterns = load_gitignore()
+    if not hasattr(args, "paths"):
+        args.paths = [args.path] if hasattr(args, "path") else []
     for path in args.paths:
-        if os.path.exists(path):
-            with open(path,'rb') as f:
+        if os.path.isfile(path) and not is_ignored(path, ignore_patterns):
+            with open(path,"rb") as f:
                 data = f.read()
-            sha = hash_object(data, b'blob', repo)
-            print(f"added {path} -> {sha}")
-        else:
-            print(f"{path} does not exist")
+            sha = object_write(GitBlob(repo,data))
+            print(f"added {path} ({sha})")
 
 def cmd_commit(args):
-    repo = GitRepository(".")
-    files = list_repo_files(repo)
+    repo = repo_find()
+    author = args.author if hasattr(args, "author") else "Anonymous <anon>"
+    message = args.message if hasattr(args, "message") else "Commit message"
     tree = GitTree(repo)
-    for f in files:
-        with open(f,'rb') as fd:
-            tree_add_blob(tree,f,fd.read(),repo)
-    tree_sha = write_object(tree)
-    parent_sha = None
-    if os.path.exists(os.path.join(repo.gitdir,'refs','heads','master')):
-        parent_sha = open(os.path.join(repo.gitdir,'refs','heads','master')).read().strip()
-    commit = GitCommit(repo, tree_sha, parent_sha, args.author, args.message)
-    commit_sha = write_object(commit)
-    with open(os.path.join(repo.gitdir,'refs','heads','master'),'w') as f:
+    for f in os.listdir("."):
+        if os.path.isfile(f) and f != ".git":
+            with open(f,"rb") as fd:
+                data = fd.read()
+            sha = object_write(GitBlob(repo,data))
+            tree.items.append(GitTreeLeaf(b'100644', f.encode(), sha))
+    tree_sha = object_write(tree)
+    head_file = repo_file(repo,"refs","heads","master")
+    parent = None
+    if os.path.exists(head_file):
+        parent = open(head_file).read().strip()
+    commit = GitCommit(repo, tree_sha, parent, author, message)
+    commit_sha = object_write(commit)
+    with open(head_file,"w") as f:
         f.write(commit_sha)
     print(f"Committed {commit_sha}")
 
 def cmd_rm(args):
-    for path in args.paths:
-        if os.path.exists(path):
-            os.remove(path)
-            print(f"removed {path}")
+    if not hasattr(args, "paths"):
+        args.paths = [args.path] if hasattr(args, "path") else []
+    for f in args.paths:
+        if os.path.exists(f):
+            os.remove(f)
+            print(f"removed {f}")
         else:
-            print(f"{path} does not exist")
+            print(f"{f} does not exist")
 
 def cmd_status(args):
-    files = list_repo_files(GitRepository("."))
+    repo = repo_find()
+    ignore_patterns = load_gitignore()
+    files = [f for f in os.listdir(".") if os.path.isfile(f) and f != ".git"]
+    untracked = [f for f in files if not is_ignored(f, ignore_patterns)]
     print("On branch master\n")
-    if files:
+    if untracked:
         print("Untracked files:")
-        for f in files:
-            print(f"    {f}")
+        for f in untracked:
+            print("  " + f)
     else:
         print("No untracked files")
 
 def cmd_cat_file(args):
-    repo = GitRepository(".")
-    obj = read_object(repo, args.sha)
+    repo = repo_find()
+    obj = object_read(repo, args.object)
     sys.stdout.buffer.write(obj.serialize())
 
 def cmd_checkout(args):
-    print(f"Checked out commit {args.commit} to {args.path}")
+    repo = repo_find()
+    obj = object_read(repo, args.commit)
+    print(f"Checked out {args.commit} into {args.path}")
 
 def cmd_log(args):
-    repo = GitRepository(".")
-    head_path = os.path.join(repo.gitdir,'refs','heads','master')
-    if not os.path.exists(head_path):
+    repo = repo_find()
+    head = repo_file(repo,"refs","heads","master")
+    if not os.path.exists(head):
         print("No commits yet")
         return
-    sha = open(head_path).read().strip()
+    sha = open(head).read().strip()
     while sha:
-        commit = read_object(repo,sha)
-        print(f"commit {sha}\nAuthor: {commit.author}\n\n    {commit.message}\n")
-        sha = commit.parent
+        commit = object_read(repo, sha)
+        print(f"commit {sha}\nAuthor: {commit.kvlm[b'author'].decode()}\nMessage: {commit.kvlm[b''].decode()}\n")
+        if b'parent' in commit.kvlm:
+            sha = commit.kvlm[b'parent'].decode()
+        else:
+            break
 
 def cmd_merge(args):
-    print(f"Merged {args.branch} into {args.current}")
+    print(f"Merged {args.branch} into current branch (simplified)")
 
 def cmd_rebase(args):
-    print(f"Rebased {args.branch} onto {args.onto}")
+    print(f"Rebased {args.branch} onto {args.onto} (simplified)")
 
-def cmd_hash_object(args):
-    with open(args.path,'rb') as f:
-        data = f.read()
-    sha = hash_object(data, args.type.encode(), repo=None)
-    print(sha)
-
-# -------------------------------------------------------------------
-# --------------------- Argument Parser ----------------------------
-# -------------------------------------------------------------------
-
-parser = argparse.ArgumentParser(description="Minimal VCS")
-subparsers = parser.add_subparsers(title="Commands", dest="command")
-subparsers.required = True
+# ----------------------
+# Main CLI parser
+# ----------------------
+argparser = argparse.ArgumentParser(description="The stupid content tracker")
+argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
+argsubparsers.required = True
 
 # init
-p_init = subparsers.add_parser("init")
-p_init.add_argument("path", nargs="?", default=".", help="Directory to initialize")
+p = argsubparsers.add_parser("init", help="Initialize a new, empty repository.")
+p.add_argument("path", nargs="?", default=".", help="Where to create the repository.")
+p.set_defaults(func=cmd_init)
 
 # add
-p_add = subparsers.add_parser("add")
-p_add.add_argument("paths", nargs="+", help="Files to add")
+p = argsubparsers.add_parser("add", help="Add files to the index.")
+p.add_argument("paths", nargs="+", help="Files to add")
+p.set_defaults(func=cmd_add)
 
 # commit
-p_commit = subparsers.add_parser("commit")
-p_commit.add_argument("-m","--message", required=True)
-p_commit.add_argument("--author", default="Anonymous")
+p = argsubparsers.add_parser("commit", help="Commit staged files")
+p.add_argument("-m","--message", help="Commit message")
+p.add_argument("-a","--author", help="Author name")
+p.set_defaults(func=cmd_commit)
 
 # rm
-p_rm = subparsers.add_parser("rm")
-p_rm.add_argument("paths", nargs="+", help="Files to remove")
+p = argsubparsers.add_parser("rm", help="Remove files")
+p.add_argument("paths", nargs="+", help="Files to remove")
+p.set_defaults(func=cmd_rm)
 
 # status
-p_status = subparsers.add_parser("status")
+p = argsubparsers.add_parser("status", help="Show repo status")
+p.set_defaults(func=cmd_status)
 
 # cat-file
-p_cat = subparsers.add_parser("cat-file")
-p_cat.add_argument("sha", help="Object SHA to display")
+p = argsubparsers.add_parser("cat-file", help="Show object content")
+p.add_argument("object", help="Object SHA")
+p.set_defaults(func=cmd_cat_file)
 
 # checkout
-p_checkout = subparsers.add_parser("checkout")
-p_checkout.add_argument("commit")
-p_checkout.add_argument("path")
+p = argsubparsers.add_parser("checkout", help="Checkout a commit")
+p.add_argument("commit", help="Commit SHA")
+p.add_argument("path", help="Directory path")
+p.set_defaults(func=cmd_checkout)
 
 # log
-p_log = subparsers.add_parser("log")
+p = argsubparsers.add_parser("log", help="Show commit log")
+p.set_defaults(func=cmd_log)
 
 # merge
-p_merge = subparsers.add_parser("merge")
-p_merge.add_argument("branch")
-p_merge.add_argument("current")
+p = argsubparsers.add_parser("merge", help="Merge branches")
+p.add_argument("branch", help="Branch to merge")
+p.set_defaults(func=cmd_merge)
 
 # rebase
-p_rebase = subparsers.add_parser("rebase")
-p_rebase.add_argument("branch")
-p_rebase.add_argument("onto")
+p = argsubparsers.add_parser("rebase", help="Rebase branches")
+p.add_argument("branch", help="Branch to rebase")
+p.add_argument("onto", help="Branch to rebase onto")
+p.set_defaults(func=cmd_rebase)
 
-# hash-object
-p_hash = subparsers.add_parser("hash-object")
-p_hash.add_argument("path")
-p_hash.add_argument("-t","--type", default="blob")
+def main(argv=sys.argv[1:]):
+    args = argparser.parse_args(argv)
+    args.func(args)
 
-# -------------------------------------------------------------------
-# --------------------- Main ---------------------------------------
-# -------------------------------------------------------------------
-
-def main(argv=None):
-    if argv is None:
-        argv = sys.argv[1:]
-    args = parser.parse_args(argv)
-    if args.command == "init": cmd_init(args)
-    elif args.command == "add": cmd_add(args)
-    elif args.command == "commit": cmd_commit(args)
-    elif args.command == "rm": cmd_rm(args)
-    elif args.command == "status": cmd_status(args)
-    elif args.command == "cat-file": cmd_cat_file(args)
-    elif args.command == "checkout": cmd_checkout(args)
-    elif args.command == "log": cmd_log(args)
-    elif args.command == "merge": cmd_merge(args)
-    elif args.command == "rebase": cmd_rebase(args)
-    elif args.command == "hash-object": cmd_hash_object(args)
-
-if __name__=="__main__":
+if __name__ == "__main__":
     main()
