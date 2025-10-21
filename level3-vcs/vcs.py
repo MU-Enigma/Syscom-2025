@@ -684,7 +684,7 @@ def cmd_status(args):
     print()
     
     if files:
-        print("Untracked files:")
+        print(f"Untracked files: ({len(files)} files)")
         for file in files:
             print("        " + file)
     else:
