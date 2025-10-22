@@ -34,6 +34,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == "status"      : cmd_status(args)
     elif args.command == "tag"         : cmd_tag(args)
     elif args.command == 'move'        : cmd_move(args)
+    elif args.command == 'mkdir'       : cmd_mkdir(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -747,3 +748,16 @@ def cmd_move(args):
     if os.path.exists(args.source):
         os.rename(args.source, dest)
         print(f"Moved {args.source} to {dest}")
+
+argsp = argsubparsers.add_parser("mkdir", help="Create a new directory in the repository")
+argsp.add_argument("directory", help="Directory to create")
+
+def cmd_mkdir(args):
+    repo = repo_find()
+
+    if not os.path.exists(args.directory):
+        path = os.path.join(repo.worktree, args.directory)
+        os.makedirs(path, exist_ok=True)
+        print(f"Created directory {args.directory} at {path}")
+    else:
+        print(f"Directory {args.directory} already exists")
