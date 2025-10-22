@@ -87,3 +87,19 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x pattern_printer.sh     # give permission to execute
 ./pattern_printer.sh            # run the game
 ```
+## 🎮 Game 6: Math Quiz
+
+### 📘 Description
+A short arithmetic quiz that asks random addition, subtraction, or multiplication questions.
+
+### ⚙️ How It Works
+- Player chooses how many questions.
+- Each question is randomly generated using numbers from 1–20.
+- Player types an integer answer; score is tallied.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x math_quiz.sh
+./math_quiz.sh
+```
