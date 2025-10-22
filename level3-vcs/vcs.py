@@ -684,7 +684,7 @@ def cmd_status(args):
     print()
     
     if files:
-        print("Untracked files:")
+        print(f"Untracked files: ({len(files)} files)")
         for file in files:
             print("        " + file)
     else:
@@ -735,3 +735,20 @@ def cmd_merge(args):
         f.write(commit_hash + '\n')
 
     print(f"Created merge commit {commit_hash}")
+#simple add command to add files to index/staging area (incomplete)
+argsp = argsubparsers.add_parser("add", help="Add files to staging area") 
+
+def cmd_add(args):
+    repo = repo_find()
+
+    for path in args.paths:
+        if os.path.exists(path):
+            if os.path.isfile(path):
+                with open(path, "rb") as fd: #opens in read mode for binary files
+                    # creating blob blah blah (i didnt understand that sht)(basically adding files to index/staging area i guess)
+                    # left space for adding to index
+                    print(f"Added {path}")
+            else:
+                print(f"Error: {path} is not a regular file")
+        else:
+            print(f"Error: {path} does not exist")
