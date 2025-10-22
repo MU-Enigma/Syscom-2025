@@ -39,3 +39,19 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x rps.sh            # give permission to execute
 ./rps.sh                   # run the game
 ```
+## 🎮 Game 3: Dice Roller
+
+### 📘 Description
+A simple terminal dice roller that simulates rolling one or more six-sided dice.
+
+### ⚙️ How It Works
+- The player enters how many dice to roll.
+- Each die generates a random number between **1 and 6**.
+- Results for all dice are displayed on screen.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x dice_roller.sh     # give permission to execute
+./dice_roller.sh            # run the game
+```
