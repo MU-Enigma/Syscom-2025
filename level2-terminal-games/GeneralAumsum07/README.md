@@ -71,3 +71,19 @@ Guess letters to reveal the hidden word before you run out of tries.
 cd level2-terminal-games/GeneralAumsum07
 chmod +x hangman.sh       # give permission to execute
 ./hangman.sh              # run the game
+```
+## 🎮 Game 5: Pattern Printer
+
+### 📘 Description
+A small Bash program that prints patterns made of any symbol you choose.
+
+### ⚙️ How It Works
+- The player enters a symbol (e.g., `*`, `#`, `$`) and the number of rows.
+- The script prints a simple triangle pattern using that symbol.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x pattern_printer.sh     # give permission to execute
+./pattern_printer.sh            # run the game
+```
