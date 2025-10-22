@@ -87,3 +87,21 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x pattern_printer.sh     # give permission to execute
 ./pattern_printer.sh            # run the game
 ```
+## 🎮 Game 7: Slot Machine
+
+### 📘 Description
+A simple **Slot Machine** simulator built in Bash.  
+Press Enter to spin and see if you can hit the jackpot!
+
+### ⚙️ How It Works
+- Each spin randomly selects 3 symbols from a list (🍒 🍋 🍇 💎 etc.).  
+- Three matches = Jackpot 
+- Two matches = Partial win
+- No matches = Better luck next time
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x slot_machine.sh      # give permission to execute
+./slot_machine.sh             # run the game
+```
