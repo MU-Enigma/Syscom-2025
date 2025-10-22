@@ -55,3 +55,19 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x dice_roller.sh     # give permission to execute
 ./dice_roller.sh            # run the game
 ```
+## 🎮 Game 4: Mini Hangman
+
+### 📘 Description
+A very simple Bash version of the classic Hangman game.  
+Guess letters to reveal the hidden word before you run out of tries.
+
+### ⚙️ How It Works
+- The game picks a random word from a small built-in list.  
+- Each correct guess reveals matching letters.  
+- You have 6 tries to complete the word.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x hangman.sh       # give permission to execute
+./hangman.sh              # run the game
