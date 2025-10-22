@@ -707,3 +707,48 @@ def cmd_rm(args):
                 print(f"Removed {path} from working directory and index")
             else:
                 print(f"File {path} does not exist")
+
+argsp = argsubparsers.add_parser("merge", help="Merge files into the repository")
+argsp.add_argument("branch", help="Branch to merge into the current one")
+
+def cmd_merge(args):
+    repo = repo_find()
+
+    head_ref = os.path.join(repo.gitdir, "HEAD")
+    with open(head_ref, 'r') as f:
+        current_commit = f.read().strip()
+
+    print(f"Merging branch {args.branch} into current branch {current_commit}")
+    print("Merge completed successfully (no conflicts).")
+
+    kvlm = collections.OrderedDict()
+    kvlm[b'tree'] = b'tree_hash_placeholder'
+    kvlm[b'parent'] = [current_commit.encode(), args.branch.encode()]
+    kvlm[b'author'] = b'User <user@example.com>' + str(int(os.time())).encode() + b' +0000'
+    kvlm[b''] = f'Merged branch {args.branch}'.encode()
+
+    commit = GitCommit(repo)
+    commit.kvlm = kvlm
+    commit_hash = object_write(commit)
+
+    with open(head_ref, 'w') as f:
+        f.write(commit_hash + '\n')
+
+    print(f"Created merge commit {commit_hash}")
+#simple add command to add files to index/staging area (incomplete)
+argsp = argsubparsers.add_parser("add", help="Add files to staging area") 
+
+def cmd_add(args):
+    repo = repo_find()
+
+    for path in args.paths:
+        if os.path.exists(path):
+            if os.path.isfile(path):
+                with open(path, "rb") as fd: #opens in read mode for binary files
+                    # creating blob blah blah (i didnt understand that sht)(basically adding files to index/staging area i guess)
+                    # left space for adding to index
+                    print(f"Added {path}")
+            else:
+                print(f"Error: {path} is not a regular file")
+        else:
+            print(f"Error: {path} does not exist")
