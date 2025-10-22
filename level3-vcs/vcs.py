@@ -707,3 +707,21 @@ def cmd_rm(args):
                 print(f"Removed {path} from working directory and index")
             else:
                 print(f"File {path} does not exist")
+
+#simple add command to add files to index/staging area (incomplete)
+argsp = argsubparsers.add_parser("add", help="Add files to staging area") 
+
+def cmd_add(args):
+    repo = repo_find()
+
+    for path in args.paths:
+        if os.path.exists(path):
+            if os.path.isfile(path):
+                with open(path, "rb") as fd: #opens in read mode for binary files
+                    # creating blob blah blah (i didnt understand that sht)(basically adding files to index/staging area i guess)
+                    # left space for adding to index
+                    print(f"Added {path}")
+            else:
+                print(f"Error: {path} is not a regular file")
+        else:
+            print(f"Error: {path} does not exist")
