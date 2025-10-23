@@ -10,6 +10,7 @@ import os
 import re
 import sys
 import zlib
+import stat
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
 argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
@@ -34,6 +35,8 @@ def main(argv=sys.argv[1:]):
     elif args.command == "status"      : cmd_status(args)
     elif args.command == "tag"         : cmd_tag(args)
     elif args.command == 'move'        : cmd_move(args)
+    elif args.command == 'mkdir'       : cmd_mkdir(args)
+    elif args.command == 'chmod'       : cmd_chmod(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -747,3 +750,38 @@ def cmd_move(args):
     if os.path.exists(args.source):
         os.rename(args.source, dest)
         print(f"Moved {args.source} to {dest}")
+
+argsp = argsubparsers.add_parser("mkdir", help="Create a new directory in the repository")
+argsp.add_argument("directory", help="Directory to create")
+
+def cmd_mkdir(args):
+    repo = repo_find()
+
+    if not os.path.exists(args.directory):
+        path = os.path.join(repo.worktree, args.directory)
+        os.makedirs(path, exist_ok=True)
+        print(f"Created directory {args.directory} at {path}")
+    else:
+        print(f"Directory {args.directory} already exists")
+
+argsp = argsubparsers.add_parser("cmhod", help="Changes the permisions of the directory")
+argsp.add_argument("directory", help="Directory to change permissions")
+argsp.add_argument("permissions", help="New permissions in octal format")
+
+def cmd_chmod(args):
+    repo = repo_find()
+
+    if os.path.exists(args.directory):
+        path = os.path.join(repo.worktree, args.directory)
+        if args.permissions == ['r', 'readonly', 'read']:
+            os.chmod(args.directory, stat.S_IREAD)
+        elif args.permissions == ['rw', 'readwrite', 'write']:
+            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE)
+        elif args.permissions == ['full', 'rwx', 'readwriteexecute']:
+            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
+        else:
+            print("Invalid permissions specified. Use 'readonly', 'readwrite', or 'readwriteexecute'.")
+            return
+        print(f"Changed permissions of {args.directory} to {args.permissions}")
+    else:
+        print(f"Directory {args.directory} does not exist")

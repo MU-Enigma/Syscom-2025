@@ -39,3 +39,51 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x rps.sh            # give permission to execute
 ./rps.sh                   # run the game
 ```
+## 🎮 Game 3: Dice Roller
+
+### 📘 Description
+A simple terminal dice roller that simulates rolling one or more six-sided dice.
+
+### ⚙️ How It Works
+- The player enters how many dice to roll.
+- Each die generates a random number between **1 and 6**.
+- Results for all dice are displayed on screen.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x dice_roller.sh     # give permission to execute
+./dice_roller.sh            # run the game
+```
+## 🎮 Game 4: Mini Hangman
+
+### 📘 Description
+A very simple Bash version of the classic Hangman game.  
+Guess letters to reveal the hidden word before you run out of tries.
+
+### ⚙️ How It Works
+- The game picks a random word from a small built-in list.  
+- Each correct guess reveals matching letters.  
+- You have 6 tries to complete the word.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x hangman.sh       # give permission to execute
+./hangman.sh              # run the game
+```
+## 🎮 Game 5: Pattern Printer
+
+### 📘 Description
+A small Bash program that prints patterns made of any symbol you choose.
+
+### ⚙️ How It Works
+- The player enters a symbol (e.g., `*`, `#`, `$`) and the number of rows.
+- The script prints a simple triangle pattern using that symbol.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x pattern_printer.sh     # give permission to execute
+./pattern_printer.sh            # run the game
+```
