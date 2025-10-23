@@ -10,6 +10,8 @@ import re
 import sys
 import zlib
 import stat
+import shutil
+
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
 argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
@@ -36,6 +38,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == 'move'        : cmd_move(args)
     elif args.command == 'mkdir'       : cmd_mkdir(args)
     elif args.command == 'chmod'       : cmd_chmod(args)
+    elif args.command == "version"     : cmd_version(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -834,3 +837,85 @@ def cmd_chmod(args):
     except FileNotFoundError:
         print(f"Directory {args.directory} not found.", file=sys.stderr)
         sys.exit(1)
+
+argsp = argsubparsers.add_parser("version", help="Access versions of the file")
+argsp.add_argument("mode", choices=["create", "open", "remove"], help="Version operation mode")
+argsp.add_argument("file", help="File to check versions for")
+
+def cmd_version(args):
+    repo = repo_find()
+    
+    # Create version directory path in repo worktree
+    version_dir_name = f"{args.file} Versions"
+    version_dir_path = os.path.join(repo.worktree, version_dir_name)
+    
+    if args.mode == "create":
+        try:
+            # Create versions directory if it doesn't exist
+            os.makedirs(version_dir_path, exist_ok=True)
+            
+            # Get current version count
+            existing_versions = [f for f in os.listdir(version_dir_path) 
+                               if f.startswith(os.path.basename(args.file))]
+            
+            # Calculate next version number
+            next_version = len(existing_versions) + 1
+            
+            # Create versioned filename
+            file_name, file_extension = os.path.splitext(os.path.basename(args.file))
+            versioned_file = f"{file_name}_v{next_version}{file_extension}"
+            versioned_file_path = os.path.join(version_dir_path, versioned_file)
+            
+            # Copy original file to version directory
+            if os.path.exists(args.file):
+                shutil.copy2(args.file, versioned_file_path)
+                print(f"Created version {next_version}: {versioned_file}")
+            else:
+                print(f"Error: Source file {args.file} not found", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error creating version: {e}", file=sys.stderr)
+            sys.exit(1)
+    
+    elif args.mode == "open":
+        try:
+            if not os.path.exists(version_dir_path):
+                print(f"No versions found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            # List available versions
+            version_files = [f for f in os.listdir(version_dir_path) 
+                           if not f.startswith('.')]  # Skip hidden files
+            
+            if not version_files:
+                print(f"No versions found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            print(f"Available versions for {args.file}:")
+            for i, vf in enumerate(sorted(version_files), 1):
+                print(f"  {i}. {vf}")
+            
+            # Let user select a version to open
+            try:
+                selection = int(input("Enter version number to open: ")) - 1
+                if 0 <= selection < len(version_files):
+                    selected_file = os.path.join(version_dir_path, sorted(version_files)[selection])
+                    
+                    # Copy to current directory for editing
+                    temp_file = f"EDITING_{os.path.basename(selected_file)}"
+                    shutil.copy2(selected_file, temp_file)
+                    
+                    print(f"Opened {sorted(version_files)[selection]} as {temp_file}")
+                    print("Edit the file, then use 'create' mode to save as new version")
+                else:
+                    print("Invalid selection", file=sys.stderr)
+                    sys.exit(1)
+                    
+            except (ValueError, EOFError):
+                print("Invalid input", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error opening version: {e}", file=sys.stderr)
+            sys.exit(1)
