@@ -10,7 +10,8 @@ import os
 import re
 import sys
 import zlib
-import stat
+import fnmatch
+import time
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
 argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
@@ -34,9 +35,6 @@ def main(argv=sys.argv[1:]):
     elif args.command == "show-ref"    : cmd_show_ref(args)
     elif args.command == "status"      : cmd_status(args)
     elif args.command == "tag"         : cmd_tag(args)
-    elif args.command == 'move'        : cmd_move(args)
-    elif args.command == 'mkdir'       : cmd_mkdir(args)
-    elif args.command == 'chmod'       : cmd_chmod(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -243,6 +241,9 @@ class GitBlob(GitObject):
 argsp = argsubparsers.add_parser("cat-file", help="Provide content of repository objects")
 argsp.add_argument("type", metavar="type", choices=["blob", "commit", "tag", "tree"], help="Specify the type")
 argsp.add_argument("object", metavar="object",help="The object to display")
+
+argsp = argsubparsers.add_parser("add", help="Add file contents to the index")
+argsp.add_argument("paths", nargs="+", help="Files to add")
 
 def cmd_cat_file(args):
     repo = repo_find()
@@ -526,6 +527,40 @@ def ref_list(repo, path=None):
 
     return ret
 
+def read_gitignore(repo):
+    ignore_path = os.path.join(repo.worktree, ".gitignore")
+    patterns = []
+
+    if not os.path.exists(ignore_path):
+        return patterns
+
+    with open(ignore_path, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            patterns.append(line)
+
+    return patterns
+
+def is_ignored(path, ignore_patterns):
+    ignored = False
+    for pattern in ignore_patterns:
+        if pattern.startswith("!"):
+            if matches_pattern(path, pattern[1:]):
+                return False
+        else:
+            if matches_pattern(path, pattern):
+                ignored = True
+    return ignored
+
+def matches_pattern(path, pattern):
+    if pattern.endswith("/"):
+        # Match directory (prefix)
+        return path.startswith(pattern)
+    else:
+        return fnmatch.fnmatch(path, pattern)
+
 argsp = argsubparsers.add_parser("show-ref", help="List references.")
 
 def cmd_show_ref(args):
@@ -678,10 +713,12 @@ argsp = argsubparsers.add_parser("status", help="Show the working tree status")
 
 def cmd_status(args):
     repo = repo_find()
+
+    ignore_patterns = read_gitignore(repo)
     
     files = []
     for item in os.listdir("."):
-        if os.path.isfile(item) and item != ".git":
+        if os.path.isfile(item) and item != ".git" and not is_ignored(item, ignore_patterns):
             files.append(item)
     
     print("On branch master")
@@ -694,94 +731,187 @@ def cmd_status(args):
     else:
         print("nothing to commit, working tree clean")
 
-# 'rm' command to remove files from index and working directory (Made by Apollo)
-argsp = argsubparsers.add_parser("rm", help="Remove files from index and working directory")
-argsp.add_argument("--cached", action="store_true", help="Remove from index only")
-argsp.add_argument("paths", nargs="+", help="Files to remove")
+def cmd_add(args):
+    repo = repo_find()
+    ignore_patterns = read_gitignore(repo)
+    index_path = os.path.join(repo.gitdir, "index")
+
+    index_entries = []
+
+    if os.path.exists(index_path):
+        with open(index_path, "r") as f:
+            for line in f:
+                parts = line.strip().split(" ")
+                if len(parts) == 3:
+                    index_entries.append(tuple(parts))
+
+    for path in args.paths:
+        if is_ignored(path, ignore_patterns):
+            continue
+
+        if os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                for name in files:
+                    full_path = os.path.join(root, name)
+                    rel_path = os.path.relpath(full_path, repo.worktree)
+
+                    if is_ignored(rel_path, ignore_patterns):
+                        continue
+
+                    add_file(repo, full_path, rel_path, index_entries)
+        else:
+            if not os.path.exists(path):
+                print(f"fatal: pathspec '{path}' did not match any files")
+                continue
+
+            add_file(repo, path, path, index_entries)
+
+    with open(index_path, "w") as f:
+        for entry in index_entries:
+            f.write(" ".join(entry) + "\n")
+
+def add_file(repo, full_path, rel_path, index_entries):
+    with open(full_path, "rb") as f:
+        data = f.read()
+
+    blob = GitBlob(repo, data)
+    sha = object_write(blob)
+
+    st = os.stat(full_path)
+    mode = oct(st.st_mode & 0o777)
+
+    entry = (mode, sha, rel_path)
+
+    # Replace existing entry if already added
+    index_entries[:] = [e for e in index_entries if e[2] != rel_path]
+    index_entries.append(entry)
+
+    print(f"added {rel_path}")
+
+argsp = argsubparsers.add_parser("commit", help="Record changes to the repository.")
+argsp.add_argument("-m", "--message", required=True, help="Commit message.")
+
+
+def cmd_commit(args):
+    repo = repo_find()
+
+    index_path = os.path.join(repo.gitdir, "index")
+    if not os.path.exists(index_path):
+        print("Nothing to commit. Index is empty.")
+        return
+
+    index_entries = []
+    with open(index_path, "r") as f:
+        for line in f:
+            parts = line.strip().split(" ")
+            if len(parts) == 3:
+                index_entries.append(tuple(parts))
+
+    tree = GitTree()
+    tree.repo = repo
+    tree.items = []
+
+    for mode, sha, path in index_entries:
+        item = GitTreeLeaf(mode.encode(), path.encode(), sha)
+        tree.items.append(item)
+
+    tree_sha = object_write(tree)
+
+    commit = GitCommit(repo)
+    commit.kvlm = collections.OrderedDict()
+    commit.kvlm[b'tree'] = tree_sha.encode()
+
+    head_path = repo_file(repo, "HEAD")
+    if os.path.exists(head_path):
+        head_ref = open(head_path).read().strip()
+        if head_ref.startswith("ref: "):
+            head_ref = head_ref[5:]
+            head_commit_path = repo_file(repo, head_ref)
+            if os.path.exists(head_commit_path):
+                parent = open(head_commit_path).read().strip()
+                commit.kvlm[b'parent'] = parent.encode()
+
+    author = b"Your Name <you@example.com>"
+    timestamp = int(time.time())
+    tz = time.strftime("%z")
+
+    commit.kvlm[b'author'] = author + b' ' + str(timestamp).encode() + b' ' + tz.encode()
+    commit.kvlm[b'committer'] = commit.kvlm[b'author']
+    commit.kvlm[b''] = args.message.encode()
+
+    commit_sha = object_write(commit)
+
+    with open(repo_file(repo, "HEAD")) as f:
+        ref = f.read().strip()
+        if ref.startswith("ref: "):
+            ref = ref[5:]
+    with open(repo_file(repo, ref), "w") as f:
+        f.write(commit_sha + "\n")
+
+    print(f"[{commit_sha[:7]}] {args.message}")
+
+argsp = argsubparsers.add_parser("rm", help="Remove files from the index and optionally the working directory.")
+argsp.add_argument("paths", nargs="+", help="Files or directories to remove.")
+argsp.add_argument("--cached", action="store_true", help="Unstage files but do not remove them from the working directory.")
 
 def cmd_rm(args):
     repo = repo_find()
+    index_path = os.path.join(repo.gitdir, "index")
+
+    if not os.path.exists(index_path):
+        print("No index file found. Nothing to remove.")
+        return
+
+    # Load the index
+    with open(index_path, "r") as f:
+        index_entries = [tuple(line.strip().split(" ")) for line in f if line.strip()]
+
+    # Flatten into a dict for fast lookup and deletion
+    index_dict = {entry[2]: entry for entry in index_entries}
+
+    removed_any = False
+
     for path in args.paths:
-        if args.cached:
-            # Simulate removing from index only
-            print(f"Removed {path} from index (kept in working directory)")
+        # If it's a directory, recursively collect all tracked files inside it
+        if os.path.isdir(path):
+            for root, dirs, files in os.walk(path):
+                for file in files:
+                    full_path = os.path.join(root, file)
+                    rel_path = os.path.relpath(full_path, repo.worktree)
+
+                    if rel_path in index_dict:
+                        del index_dict[rel_path]
+                        if not args.cached:
+                            try:
+                                os.remove(full_path)
+                            except Exception as e:
+                                print(f"warning: could not delete {rel_path}: {e}")
+                        print(f"removed {rel_path}")
+                        removed_any = True
+                    else:
+                        print(f"warning: {rel_path} is not staged.")
         else:
-            if os.path.exists(path):
-                os.remove(path)
-                print(f"Removed {path} from working directory and index")
+            if not os.path.exists(path) and not args.cached:
+                print(f"warning: '{path}' does not exist in working directory.")
+                continue
+
+            rel_path = os.path.relpath(path, repo.worktree)
+            if rel_path in index_dict:
+                del index_dict[rel_path]
+                if not args.cached:
+                    try:
+                        os.remove(path)
+                    except Exception as e:
+                        print(f"warning: could not delete {rel_path}: {e}")
+                print(f"removed {rel_path}")
+                removed_any = True
             else:
-                print(f"File {path} does not exist")
+                print(f"warning: {rel_path} is not staged.")
 
-argsp = argsubparsers.add_parser("merge", help="Merge files into the repository")
-argsp.add_argument("branch", help="Branch to merge into the current one")
+    # Write updated index
+    with open(index_path, "w") as f:
+        for entry in index_dict.values():
+            f.write(" ".join(entry) + "\n")
 
-def cmd_merge(args):
-    repo = repo_find()
-
-    head_ref = os.path.join(repo.gitdir, "HEAD")
-    with open(head_ref, 'r') as f:
-        current_commit = f.read().strip()
-
-    print(f"Merging branch {args.branch} into current branch {current_commit}")
-    print("Merge completed successfully (no conflicts).")
-
-    kvlm = collections.OrderedDict()
-    kvlm[b'tree'] = b'tree_hash_placeholder'
-    kvlm[b'parent'] = [current_commit.encode(), args.branch.encode()]
-    kvlm[b'author'] = b'User <user@example.com>' + str(int(os.time())).encode() + b' +0000'
-    kvlm[b''] = f'Merged branch {args.branch}'.encode()
-
-    commit = GitCommit(repo)
-    commit.kvlm = kvlm
-    commit_hash = object_write(commit)
-
-    with open(head_ref, 'w') as f:
-        f.write(commit_hash + '\n')
-
-    print(f"Created merge commit {commit_hash}")
-
-argsp = argsubparsers.add_parser("move", help="Move or rename a file in the repository")
-argsp.add_argument("source", help="Source file path")
-
-def cmd_move(args):
-    repo = repo_find()
-    dest = args.source + "_moved"
-
-    if os.path.exists(args.source):
-        os.rename(args.source, dest)
-        print(f"Moved {args.source} to {dest}")
-
-argsp = argsubparsers.add_parser("mkdir", help="Create a new directory in the repository")
-argsp.add_argument("directory", help="Directory to create")
-
-def cmd_mkdir(args):
-    repo = repo_find()
-
-    if not os.path.exists(args.directory):
-        path = os.path.join(repo.worktree, args.directory)
-        os.makedirs(path, exist_ok=True)
-        print(f"Created directory {args.directory} at {path}")
-    else:
-        print(f"Directory {args.directory} already exists")
-
-argsp = argsubparsers.add_parser("cmhod", help="Changes the permisions of the directory")
-argsp.add_argument("directory", help="Directory to change permissions")
-argsp.add_argument("permissions", help="New permissions in octal format")
-
-def cmd_chmod(args):
-    repo = repo_find()
-
-    if os.path.exists(args.directory):
-        path = os.path.join(repo.worktree, args.directory)
-        if args.permissions == ['r', 'readonly', 'read']:
-            os.chmod(args.directory, stat.S_IREAD)
-        elif args.permissions == ['rw', 'readwrite', 'write']:
-            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE)
-        elif args.permissions == ['full', 'rwx', 'readwriteexecute']:
-            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
-        else:
-            print("Invalid permissions specified. Use 'readonly', 'readwrite', or 'readwriteexecute'.")
-            return
-        print(f"Changed permissions of {args.directory} to {args.permissions}")
-    else:
-        print(f"Directory {args.directory} does not exist")
+    if not removed_any:
+        print("No files were removed.")
