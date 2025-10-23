@@ -10,6 +10,8 @@ import re
 import sys
 import zlib
 import stat
+import shutil
+
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
 argsubparsers = argparser.add_subparsers(title="Commands", dest="command")
@@ -36,6 +38,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == 'move'        : cmd_move(args)
     elif args.command == 'mkdir'       : cmd_mkdir(args)
     elif args.command == 'chmod'       : cmd_chmod(args)
+    elif args.command == "version"     : cmd_version(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -257,14 +260,21 @@ argsp.add_argument("-w", dest="write", action="store_true", help="Actually write
 argsp.add_argument("path", help="Read object from <file>")
 
 def cmd_hash_object(args):
-    if args.write:
-        repo = GitRepository(".")
-    else:
-        repo = None
+    try:
+        if args.write:
+            repo = GitRepository(".")
+        else:
+            repo = None
 
-    with open(args.path, "rb") as fd:
-        sha = object_hash(fd, args.type.encode(), repo)
-        print(sha)
+        with open(args.path, "rb") as fd:
+            sha = object_hash(fd, args.type.encode(), repo)
+            print(sha)
+    except Exception as e:
+        print(f"Error during hash-object: {e}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"File {args.path} not found.", file=sys.stderr)
+        sys.exit(1)
 
 def object_hash(fd, fmt, repo=None):
     data = fd.read()
@@ -278,7 +288,7 @@ def object_hash(fd, fmt, repo=None):
     else:
         raise Exception("Unknown type %s!" % fmt)
 
-    return object_write(obj, repo)
+    return object_write(obj, repo is not None)
 
 def kvlm_parse(raw, start=0, dct=None):
     if not dct:
@@ -727,15 +737,19 @@ argsp.add_argument("paths", nargs="+", help="Files to remove")
 def cmd_rm(args):
     repo = repo_find()
     for path in args.paths:
+        if not os.path.exists(path):
+            print(f"Error: File {path} not found", file=sys.stderr)
+            continue
+
         if args.cached:
             # Simulate removing from index only
             print(f"Removed {path} from index (kept in working directory)")
         else:
-            if os.path.exists(path):
+            try:
                 os.remove(path)
                 print(f"Removed {path} from working directory and index")
-            else:
-                print(f"File {path} does not exist")
+            except OSError as e:
+                print(f"Error removing {path}: {e}", file=sys.stderr)
 
 argsp = argsubparsers.add_parser("merge", help="Merge files into the repository")
 argsp.add_argument("branch", help="Branch to merge into the current one")
@@ -767,14 +781,21 @@ def cmd_merge(args):
 
 argsp = argsubparsers.add_parser("move", help="Move or rename a file in the repository")
 argsp.add_argument("source", help="Source file path")
+argsp.add_argument("dest", help="Destination path")
 
-def cmd_move(args):
+def cmd_move(args):  
     repo = repo_find()
-    dest = args.source + "_moved"
 
-    if os.path.exists(args.source):
-        os.rename(args.source, dest)
-        print(f"Moved {args.source} to {dest}")
+    if not os.path.exists(args.source):
+        print(f"Error: Source file {args.source} not found", file=sys.stderr)
+        sys.exit(1)
+    
+    if os.path.exists(args.dest):
+        print(f"Error: Destination {args.dest} already exists", file=sys.stderr)
+        sys.exit(1)
+        
+    os.rename(args.source, args.dest)
+    print(f"Moved {args.source} to {args.dest}")
 
 argsp = argsubparsers.add_parser("mkdir", help="Create a new directory in the repository")
 argsp.add_argument("directory", help="Directory to create")
@@ -794,18 +815,155 @@ argsp.add_argument("directory", help="Directory to change permissions")
 argsp.add_argument("permissions", help="New permissions in octal format")
 
 def cmd_chmod(args):
-    permission_map = {
+    try:
+        permission_map = {
         'readonly': stat.S_IREAD,
         'readwrite': stat.S_IREAD | stat.S_IWRITE,
         'readwriteexecute': stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC
-    }
+        }
     
-    if args.permissions in permission_map:
-        os.chmod(args.directory, permission_map[args.permissions])
-    else:
-        # Try to parse as octal
+        if args.permissions in permission_map:
+            os.chmod(args.directory, permission_map[args.permissions])
+        else:
+            # Try to parse as octal
+            try:
+                perm = int(args.permissions, 8)
+                os.chmod(args.directory, perm)
+            except ValueError:
+                print("Invalid permissions format. Use 'readonly', 'readwrite', 'readwriteexecute' or octal format like '755'.", file=sys.stderr)
+    except PermissionError:
+        print("Error: Permission denied!", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Directory {args.directory} not found.", file=sys.stderr)
+        sys.exit(1)
+
+argsp = argsubparsers.add_parser("version", help="Access versions of the file")
+argsp.add_argument("mode", choices=["create", "open", "remove"], help="Version operation mode")
+argsp.add_argument("file", help="File to check versions for")
+
+def cmd_version(args):
+    repo = repo_find()
+    
+    # Create version directory path in repo worktree
+    version_dir_name = f"{args.file} Versions"
+    version_dir_path = os.path.join(repo.worktree, version_dir_name)
+    
+    if args.mode == "create":
         try:
-            perm = int(args.permissions, 8)
-            os.chmod(args.directory, perm)
-        except ValueError:
-            print("Invalid permissions format")
+            # Create versions directory if it doesn't exist
+            os.makedirs(version_dir_path, exist_ok=True)
+            
+            # Get current version count
+            existing_versions = [f for f in os.listdir(version_dir_path) 
+                               if f.startswith(os.path.basename(args.file))]
+            
+            # Calculate next version number
+            next_version = len(existing_versions) + 1
+            
+            # Create versioned filename
+            file_name, file_extension = os.path.splitext(os.path.basename(args.file))
+            versioned_file = f"{file_name}_v{next_version}{file_extension}"
+            versioned_file_path = os.path.join(version_dir_path, versioned_file)
+            
+            # Copy original file to version directory
+            if os.path.exists(args.file):
+                shutil.copy2(args.file, versioned_file_path)
+                print(f"Created version {next_version}: {versioned_file}")
+            else:
+                print(f"Error: Source file {args.file} not found", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error creating version: {e}", file=sys.stderr)
+            sys.exit(1)
+    
+    elif args.mode == "open":
+        try:
+            if not os.path.exists(version_dir_path):
+                print(f"No versions found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            # List available versions
+            version_files = [f for f in os.listdir(version_dir_path) 
+                           if not f.startswith('.')]  # Skip hidden files
+            
+            if not version_files:
+                print(f"No versions found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            print(f"Available versions for {args.file}:")
+            for i, vf in enumerate(sorted(version_files), 1):
+                print(f"  {i}. {vf}")
+            
+            # Let user select a version to open
+            try:
+                selection = int(input("Enter version number to open: ")) - 1
+                if 0 <= selection < len(version_files):
+                    selected_file = os.path.join(version_dir_path, sorted(version_files)[selection])
+                    
+                    # Copy to current directory for editing
+                    temp_file = f"EDITING_{os.path.basename(selected_file)}"
+                    shutil.copy2(selected_file, temp_file)
+                    
+                    print(f"Opened {sorted(version_files)[selection]} as {temp_file}")
+                    print("Edit the file, then use 'create' mode to save as new version")
+                else:
+                    print("Invalid selection", file=sys.stderr)
+                    sys.exit(1)
+                    
+            except (ValueError, EOFError):
+                print("Invalid input", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error opening version: {e}", file=sys.stderr)
+            sys.exit(1)
+    
+    elif args.mode == "remove":
+        try:
+            if not os.path.exists(version_dir_path):
+                print(f"No versioning directory found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            # List versions for removal selection
+            version_files = [f for f in os.listdir(version_dir_path) 
+                           if not f.startswith('.')]
+            
+            if not version_files:
+                print(f"No versions found to remove", file=sys.stderr)
+                sys.exit(1)
+            
+            print("Available versions to remove:")
+            for i, vf in enumerate(sorted(version_files), 1):
+                print(f"  {i}. {vf}")
+            print("  a. Remove ALL versions and directory")
+            
+            try:
+                selection = input("Enter version number to remove or 'a' for all: ")
+                
+                if selection.lower() == 'a':
+                    shutil.rmtree(version_dir_path)
+                    print(f"Removed all versions and directory for {args.file}")
+                else:
+                    selection = int(selection) - 1
+                    if 0 <= selection < len(version_files):
+                        file_to_remove = os.path.join(version_dir_path, sorted(version_files)[selection])
+                        os.remove(file_to_remove)
+                        print(f"Removed version: {sorted(version_files)[selection]}")
+                        
+                        # Remove directory if empty
+                        if not os.listdir(version_dir_path):
+                            os.rmdir(version_dir_path)
+                    else:
+                        print("Invalid selection", file=sys.stderr)
+                        sys.exit(1)
+                        
+            except (ValueError, EOFError):
+                print("Invalid input", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error removing version: {e}", file=sys.stderr)
+            sys.exit(1)
+
