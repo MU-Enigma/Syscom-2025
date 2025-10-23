@@ -919,3 +919,51 @@ def cmd_version(args):
         except Exception as e:
             print(f"Error opening version: {e}", file=sys.stderr)
             sys.exit(1)
+    
+    elif args.mode == "remove":
+        try:
+            if not os.path.exists(version_dir_path):
+                print(f"No versioning directory found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            # List versions for removal selection
+            version_files = [f for f in os.listdir(version_dir_path) 
+                           if not f.startswith('.')]
+            
+            if not version_files:
+                print(f"No versions found to remove", file=sys.stderr)
+                sys.exit(1)
+            
+            print("Available versions to remove:")
+            for i, vf in enumerate(sorted(version_files), 1):
+                print(f"  {i}. {vf}")
+            print("  a. Remove ALL versions and directory")
+            
+            try:
+                selection = input("Enter version number to remove or 'a' for all: ")
+                
+                if selection.lower() == 'a':
+                    shutil.rmtree(version_dir_path)
+                    print(f"Removed all versions and directory for {args.file}")
+                else:
+                    selection = int(selection) - 1
+                    if 0 <= selection < len(version_files):
+                        file_to_remove = os.path.join(version_dir_path, sorted(version_files)[selection])
+                        os.remove(file_to_remove)
+                        print(f"Removed version: {sorted(version_files)[selection]}")
+                        
+                        # Remove directory if empty
+                        if not os.listdir(version_dir_path):
+                            os.rmdir(version_dir_path)
+                    else:
+                        print("Invalid selection", file=sys.stderr)
+                        sys.exit(1)
+                        
+            except (ValueError, EOFError):
+                print("Invalid input", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error removing version: {e}", file=sys.stderr)
+            sys.exit(1)
+
