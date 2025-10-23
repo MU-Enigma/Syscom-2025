@@ -1,4 +1,3 @@
-
 # vcs_buggy.py
 # Intentionally unfinished version for Level 3 .
 # This file contains multiple known issues that contributors will need to fix.
@@ -548,6 +547,28 @@ argsp.add_argument("-a", action="store_true", dest="create_tag_object", help="Wh
 argsp.add_argument("name", nargs="?", help="The new tag's name")
 argsp.add_argument("object", default="HEAD", nargs="?", help="The object the new tag will point to")
 
+# FIX: Implement missing tag_create function
+def tag_create(name, obj, type="ref"):
+    repo = repo_find()
+    if type == "object":
+        # Create tag object
+        tag = GitTag(repo)
+        tag.kvlm = collections.OrderedDict()
+        tag.kvlm[b'object'] = object_find(repo, obj).encode()
+        tag.kvlm[b'type'] = b'commit'
+        tag.kvlm[b'tag'] = name.encode()
+        tag.kvlm[b'tagger'] = b'User <user@example.com>'
+        tag.kvlm[b''] = f'Tag {name}'.encode()
+        tag_sha = object_write(tag)
+        
+        # Create tag reference
+        with open(repo_file(repo, "refs", "tags", name), "w") as f:
+            f.write(tag_sha + "\n")
+    else:
+        # Simple ref tag
+        with open(repo_file(repo, "refs", "tags", name), "w") as f:
+            f.write(object_find(repo, obj) + "\n")
+
 def cmd_tag(args):
     repo = repo_find()
 
@@ -764,24 +785,23 @@ def cmd_mkdir(args):
     else:
         print(f"Directory {args.directory} already exists")
 
-argsp = argsubparsers.add_parser("cmhod", help="Changes the permisions of the directory")
+argsp = argsubparsers.add_parser("chmod", help="Changes the permisions of the directory")
 argsp.add_argument("directory", help="Directory to change permissions")
 argsp.add_argument("permissions", help="New permissions in octal format")
 
 def cmd_chmod(args):
-    repo = repo_find()
-
-    if os.path.exists(args.directory):
-        path = os.path.join(repo.worktree, args.directory)
-        if args.permissions == ['r', 'readonly', 'read']:
-            os.chmod(args.directory, stat.S_IREAD)
-        elif args.permissions == ['rw', 'readwrite', 'write']:
-            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE)
-        elif args.permissions == ['full', 'rwx', 'readwriteexecute']:
-            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
-        else:
-            print("Invalid permissions specified. Use 'readonly', 'readwrite', or 'readwriteexecute'.")
-            return
-        print(f"Changed permissions of {args.directory} to {args.permissions}")
+    permission_map = {
+        'readonly': stat.S_IREAD,
+        'readwrite': stat.S_IREAD | stat.S_IWRITE,
+        'readwriteexecute': stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC
+    }
+    
+    if args.permissions in permission_map:
+        os.chmod(args.directory, permission_map[args.permissions])
     else:
-        print(f"Directory {args.directory} does not exist")
+        # Try to parse as octal
+        try:
+            perm = int(args.permissions, 8)
+            os.chmod(args.directory, perm)
+        except ValueError:
+            print("Invalid permissions format")
