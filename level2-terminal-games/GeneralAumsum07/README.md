@@ -103,3 +103,38 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x math_quiz.sh
 ./math_quiz.sh
 ```
+
+## 🎮 Game 7: Slot Machine
+
+### 📘 Description
+A simple **Slot Machine** simulator built in Bash.  
+Press Enter to spin and see if you can hit the jackpot!
+
+### ⚙️ How It Works
+- Each spin randomly selects 3 symbols from a list (🍒 🍋 🍇 💎 etc.).  
+- Three matches = Jackpot 
+- Two matches = Partial win
+- No matches = Better luck next time
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x slot_machine.sh      # give permission to execute
+./slot_machine.sh             # run the game
+```
+## 🎮 Game 8: Magic 8-Ball
+
+### 📘 Description
+Ask any yes/no question and let the mystical 8-Ball decide your fate.
+
+### ⚙️ How It Works
+- Type your question and press Enter.  
+- The 8-Ball responds with a random fortune.  
+- Type **quit** to exit.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x magic8ball.sh
+./magic8ball.sh
+```
