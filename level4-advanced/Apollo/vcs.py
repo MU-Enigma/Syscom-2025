@@ -1,4 +1,3 @@
-
 # vcs_buggy.py
 # Intentionally unfinished version for Level 3 .
 # This file contains multiple known issues that contributors will need to fix.
@@ -548,6 +547,28 @@ argsp.add_argument("-a", action="store_true", dest="create_tag_object", help="Wh
 argsp.add_argument("name", nargs="?", help="The new tag's name")
 argsp.add_argument("object", default="HEAD", nargs="?", help="The object the new tag will point to")
 
+# FIX: Implement missing tag_create function
+def tag_create(name, obj, type="ref"):
+    repo = repo_find()
+    if type == "object":
+        # Create tag object
+        tag = GitTag(repo)
+        tag.kvlm = collections.OrderedDict()
+        tag.kvlm[b'object'] = object_find(repo, obj).encode()
+        tag.kvlm[b'type'] = b'commit'
+        tag.kvlm[b'tag'] = name.encode()
+        tag.kvlm[b'tagger'] = b'User <user@example.com>'
+        tag.kvlm[b''] = f'Tag {name}'.encode()
+        tag_sha = object_write(tag)
+        
+        # Create tag reference
+        with open(repo_file(repo, "refs", "tags", name), "w") as f:
+            f.write(tag_sha + "\n")
+    else:
+        # Simple ref tag
+        with open(repo_file(repo, "refs", "tags", name), "w") as f:
+            f.write(object_find(repo, obj) + "\n")
+
 def cmd_tag(args):
     repo = repo_find()
 
@@ -785,3 +806,4 @@ def cmd_chmod(args):
         print(f"Changed permissions of {args.directory} to {args.permissions}")
     else:
         print(f"Directory {args.directory} does not exist")
+
