@@ -877,3 +877,45 @@ def cmd_version(args):
         except Exception as e:
             print(f"Error creating version: {e}", file=sys.stderr)
             sys.exit(1)
+    
+    elif args.mode == "open":
+        try:
+            if not os.path.exists(version_dir_path):
+                print(f"No versions found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            # List available versions
+            version_files = [f for f in os.listdir(version_dir_path) 
+                           if not f.startswith('.')]  # Skip hidden files
+            
+            if not version_files:
+                print(f"No versions found for {args.file}", file=sys.stderr)
+                sys.exit(1)
+            
+            print(f"Available versions for {args.file}:")
+            for i, vf in enumerate(sorted(version_files), 1):
+                print(f"  {i}. {vf}")
+            
+            # Let user select a version to open
+            try:
+                selection = int(input("Enter version number to open: ")) - 1
+                if 0 <= selection < len(version_files):
+                    selected_file = os.path.join(version_dir_path, sorted(version_files)[selection])
+                    
+                    # Copy to current directory for editing
+                    temp_file = f"EDITING_{os.path.basename(selected_file)}"
+                    shutil.copy2(selected_file, temp_file)
+                    
+                    print(f"Opened {sorted(version_files)[selection]} as {temp_file}")
+                    print("Edit the file, then use 'create' mode to save as new version")
+                else:
+                    print("Invalid selection", file=sys.stderr)
+                    sys.exit(1)
+                    
+            except (ValueError, EOFError):
+                print("Invalid input", file=sys.stderr)
+                sys.exit(1)
+                
+        except Exception as e:
+            print(f"Error opening version: {e}", file=sys.stderr)
+            sys.exit(1)
