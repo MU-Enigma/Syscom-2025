@@ -785,25 +785,23 @@ def cmd_mkdir(args):
     else:
         print(f"Directory {args.directory} already exists")
 
-argsp = argsubparsers.add_parser("cmhod", help="Changes the permisions of the directory")
+argsp = argsubparsers.add_parser("chmod", help="Changes the permisions of the directory")
 argsp.add_argument("directory", help="Directory to change permissions")
 argsp.add_argument("permissions", help="New permissions in octal format")
 
 def cmd_chmod(args):
-    repo = repo_find()
-
-    if os.path.exists(args.directory):
-        path = os.path.join(repo.worktree, args.directory)
-        if args.permissions == ['r', 'readonly', 'read']:
-            os.chmod(args.directory, stat.S_IREAD)
-        elif args.permissions == ['rw', 'readwrite', 'write']:
-            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE)
-        elif args.permissions == ['full', 'rwx', 'readwriteexecute']:
-            os.chmod(args.directory, stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC)
-        else:
-            print("Invalid permissions specified. Use 'readonly', 'readwrite', or 'readwriteexecute'.")
-            return
-        print(f"Changed permissions of {args.directory} to {args.permissions}")
+    permission_map = {
+        'readonly': stat.S_IREAD,
+        'readwrite': stat.S_IREAD | stat.S_IWRITE,
+        'readwriteexecute': stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC
+    }
+    
+    if args.permissions in permission_map:
+        os.chmod(args.directory, permission_map[args.permissions])
     else:
-        print(f"Directory {args.directory} does not exist")
-
+        # Try to parse as octal
+        try:
+            perm = int(args.permissions, 8)
+            os.chmod(args.directory, perm)
+        except ValueError:
+            print("Invalid permissions format")
