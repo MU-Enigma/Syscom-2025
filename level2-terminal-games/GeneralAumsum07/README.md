@@ -105,3 +105,20 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x slot_machine.sh      # give permission to execute
 ./slot_machine.sh             # run the game
 ```
+## 🎮 Game 9: Stop the Timer
+
+### 📘 Description
+A reflex-based mini game. Try to press Enter exactly **10 seconds** after the timer starts!
+
+### ⚙️ How It Works
+- Press Enter to start the timer.  
+- Wait until you think 10 seconds have passed.  
+- Press Enter again to stop the timer.  
+- The game shows how close you were to 10 seconds.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x stop_the_timer.sh
+./stop_the_timer.sh
+```
