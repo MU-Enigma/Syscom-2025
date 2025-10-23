@@ -257,14 +257,21 @@ argsp.add_argument("-w", dest="write", action="store_true", help="Actually write
 argsp.add_argument("path", help="Read object from <file>")
 
 def cmd_hash_object(args):
-    if args.write:
-        repo = GitRepository(".")
-    else:
-        repo = None
+    try:
+        if args.write:
+            repo = GitRepository(".")
+        else:
+            repo = None
 
-    with open(args.path, "rb") as fd:
-        sha = object_hash(fd, args.type.encode(), repo)
-        print(sha)
+        with open(args.path, "rb") as fd:
+            sha = object_hash(fd, args.type.encode(), repo)
+            print(sha)
+    except Exception as e:
+        print(f"Error during hash-object: {e}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"File {args.path} not found.", file=sys.stderr)
+        sys.exit(1)
 
 def object_hash(fd, fmt, repo=None):
     data = fd.read()
@@ -278,7 +285,7 @@ def object_hash(fd, fmt, repo=None):
     else:
         raise Exception("Unknown type %s!" % fmt)
 
-    return object_write(obj, repo)
+    return object_write(obj, repo is not None)
 
 def kvlm_parse(raw, start=0, dct=None):
     if not dct:
@@ -470,24 +477,28 @@ argsp.add_argument("commit", help="The commit or tree to checkout.")
 argsp.add_argument("path", help="The EMPTY directory to checkout on.")
 
 def cmd_checkout(args):
-    repo = repo_find()
+   try:
+     repo = repo_find()
 
-    obj = object_read(repo, object_find(repo, args.commit))
+     obj = object_read(repo, object_find(repo, args.commit))
 
-    # If the object is a commit, we grab its tree
-    if obj.fmt == b'commit':
+     # If the object is a commit, we grab its tree
+     if obj.fmt == b'commit':
         obj = object_read(repo, obj.kvlm[b'tree'].decode("ascii"))
 
-    # Verify that path is an empty directory
-    if os.path.exists(args.path):
+     # Verify that path is an empty directory
+     if os.path.exists(args.path):
         if not os.path.isdir(args.path):
             raise Exception("Not a directory {0}!".format(args.path))
         if os.listdir(args.path):
             raise Exception("Not empty {0}!".format(args.path))
-    else:
+     else:
         os.makedirs(args.path)
-
-    tree_checkout(repo, obj, os.path.realpath(args.path).encode())
+     tree_checkout(repo, obj, os.path.realpath(args.path).encode())
+   
+   except Exception as e:
+       print(f"Error during checkout: {e}", file=sys.stderr)
+       sys.exit(1)
 
 def tree_checkout(repo, tree, path):
     for item in tree.items:
@@ -790,18 +801,25 @@ argsp.add_argument("directory", help="Directory to change permissions")
 argsp.add_argument("permissions", help="New permissions in octal format")
 
 def cmd_chmod(args):
-    permission_map = {
+    try:
+        permission_map = {
         'readonly': stat.S_IREAD,
         'readwrite': stat.S_IREAD | stat.S_IWRITE,
         'readwriteexecute': stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC
-    }
+        }
     
-    if args.permissions in permission_map:
-        os.chmod(args.directory, permission_map[args.permissions])
-    else:
-        # Try to parse as octal
-        try:
-            perm = int(args.permissions, 8)
-            os.chmod(args.directory, perm)
-        except ValueError:
-            print("Invalid permissions format")
+        if args.permissions in permission_map:
+            os.chmod(args.directory, permission_map[args.permissions])
+        else:
+            # Try to parse as octal
+            try:
+                perm = int(args.permissions, 8)
+                os.chmod(args.directory, perm)
+            except ValueError:
+                print("Invalid permissions format. Use 'readonly', 'readwrite', 'readwriteexecute' or octal format like '755'.", file=sys.stderr)
+    except PermissionError:
+        print("Error: Permission denied!", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Directory {args.directory} not found.", file=sys.stderr)
+        sys.exit(1)
