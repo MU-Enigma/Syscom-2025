@@ -734,15 +734,19 @@ argsp.add_argument("paths", nargs="+", help="Files to remove")
 def cmd_rm(args):
     repo = repo_find()
     for path in args.paths:
+        if not os.path.exists(path):
+            print(f"Error: File {path} not found", file=sys.stderr)
+            continue
+
         if args.cached:
             # Simulate removing from index only
             print(f"Removed {path} from index (kept in working directory)")
         else:
-            if os.path.exists(path):
+            try:
                 os.remove(path)
                 print(f"Removed {path} from working directory and index")
-            else:
-                print(f"File {path} does not exist")
+            except OSError as e:
+                print(f"Error removing {path}: {e}", file=sys.stderr)
 
 argsp = argsubparsers.add_parser("merge", help="Merge files into the repository")
 argsp.add_argument("branch", help="Branch to merge into the current one")
@@ -778,7 +782,7 @@ argsp.add_argument("dest", help="Destination path")
 
 def cmd_move(args):  
     repo = repo_find()
-    
+
     if not os.path.exists(args.source):
         print(f"Error: Source file {args.source} not found", file=sys.stderr)
         sys.exit(1)
