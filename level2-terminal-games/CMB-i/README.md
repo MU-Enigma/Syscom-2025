@@ -1,9 +1,6 @@
 # Level 2: Simple Terminal Game  
 **Goal:** Build something interactive in the terminal.
 
-This level introduces you to **logic**, **loops**, and **user input handling** through small games that run entirely in the terminal.  
-You’ll learn how to manage **program flow**, make **decisions**, and interact with users via **standard input/output** — all using pure Bash.
-
 ---
 ## Rock–Paper–Scissors
 
