@@ -774,14 +774,21 @@ def cmd_merge(args):
 
 argsp = argsubparsers.add_parser("move", help="Move or rename a file in the repository")
 argsp.add_argument("source", help="Source file path")
+argsp.add_argument("dest", help="Destination path")
 
-def cmd_move(args):
+def cmd_move(args):  
     repo = repo_find()
-    dest = args.source + "_moved"
-
-    if os.path.exists(args.source):
-        os.rename(args.source, dest)
-        print(f"Moved {args.source} to {dest}")
+    
+    if not os.path.exists(args.source):
+        print(f"Error: Source file {args.source} not found", file=sys.stderr)
+        sys.exit(1)
+    
+    if os.path.exists(args.dest):
+        print(f"Error: Destination {args.dest} already exists", file=sys.stderr)
+        sys.exit(1)
+        
+    os.rename(args.source, args.dest)
+    print(f"Moved {args.source} to {args.dest}")
 
 argsp = argsubparsers.add_parser("mkdir", help="Create a new directory in the repository")
 argsp.add_argument("directory", help="Directory to create")
