@@ -257,14 +257,21 @@ argsp.add_argument("-w", dest="write", action="store_true", help="Actually write
 argsp.add_argument("path", help="Read object from <file>")
 
 def cmd_hash_object(args):
-    if args.write:
-        repo = GitRepository(".")
-    else:
-        repo = None
+    try:
+        if args.write:
+            repo = GitRepository(".")
+        else:
+            repo = None
 
-    with open(args.path, "rb") as fd:
-        sha = object_hash(fd, args.type.encode(), repo)
-        print(sha)
+        with open(args.path, "rb") as fd:
+            sha = object_hash(fd, args.type.encode(), repo)
+            print(sha)
+    except Exception as e:
+        print(f"Error during hash-object: {e}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"File {args.path} not found.", file=sys.stderr)
+        sys.exit(1)
 
 def object_hash(fd, fmt, repo=None):
     data = fd.read()
@@ -278,7 +285,7 @@ def object_hash(fd, fmt, repo=None):
     else:
         raise Exception("Unknown type %s!" % fmt)
 
-    return object_write(obj, repo)
+    return object_write(obj, repo is not None)
 
 def kvlm_parse(raw, start=0, dct=None):
     if not dct:
@@ -727,15 +734,19 @@ argsp.add_argument("paths", nargs="+", help="Files to remove")
 def cmd_rm(args):
     repo = repo_find()
     for path in args.paths:
+        if not os.path.exists(path):
+            print(f"Error: File {path} not found", file=sys.stderr)
+            continue
+
         if args.cached:
             # Simulate removing from index only
             print(f"Removed {path} from index (kept in working directory)")
         else:
-            if os.path.exists(path):
+            try:
                 os.remove(path)
                 print(f"Removed {path} from working directory and index")
-            else:
-                print(f"File {path} does not exist")
+            except OSError as e:
+                print(f"Error removing {path}: {e}", file=sys.stderr)
 
 argsp = argsubparsers.add_parser("merge", help="Merge files into the repository")
 argsp.add_argument("branch", help="Branch to merge into the current one")
@@ -767,14 +778,21 @@ def cmd_merge(args):
 
 argsp = argsubparsers.add_parser("move", help="Move or rename a file in the repository")
 argsp.add_argument("source", help="Source file path")
+argsp.add_argument("dest", help="Destination path")
 
-def cmd_move(args):
+def cmd_move(args):  
     repo = repo_find()
-    dest = args.source + "_moved"
 
-    if os.path.exists(args.source):
-        os.rename(args.source, dest)
-        print(f"Moved {args.source} to {dest}")
+    if not os.path.exists(args.source):
+        print(f"Error: Source file {args.source} not found", file=sys.stderr)
+        sys.exit(1)
+    
+    if os.path.exists(args.dest):
+        print(f"Error: Destination {args.dest} already exists", file=sys.stderr)
+        sys.exit(1)
+        
+    os.rename(args.source, args.dest)
+    print(f"Moved {args.source} to {args.dest}")
 
 argsp = argsubparsers.add_parser("mkdir", help="Create a new directory in the repository")
 argsp.add_argument("directory", help="Directory to create")
@@ -794,18 +812,25 @@ argsp.add_argument("directory", help="Directory to change permissions")
 argsp.add_argument("permissions", help="New permissions in octal format")
 
 def cmd_chmod(args):
-    permission_map = {
+    try:
+        permission_map = {
         'readonly': stat.S_IREAD,
         'readwrite': stat.S_IREAD | stat.S_IWRITE,
         'readwriteexecute': stat.S_IREAD | stat.S_IWRITE | stat.S_IEXEC
-    }
+        }
     
-    if args.permissions in permission_map:
-        os.chmod(args.directory, permission_map[args.permissions])
-    else:
-        # Try to parse as octal
-        try:
-            perm = int(args.permissions, 8)
-            os.chmod(args.directory, perm)
-        except ValueError:
-            print("Invalid permissions format")
+        if args.permissions in permission_map:
+            os.chmod(args.directory, permission_map[args.permissions])
+        else:
+            # Try to parse as octal
+            try:
+                perm = int(args.permissions, 8)
+                os.chmod(args.directory, perm)
+            except ValueError:
+                print("Invalid permissions format. Use 'readonly', 'readwrite', 'readwriteexecute' or octal format like '755'.", file=sys.stderr)
+    except PermissionError:
+        print("Error: Permission denied!", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"Directory {args.directory} not found.", file=sys.stderr)
+        sys.exit(1)
