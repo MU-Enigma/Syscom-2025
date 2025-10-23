@@ -1,6 +1,4 @@
-#!/bin/bash
-
-echo "--- Odd or Even ---"
+echo "Odd or Even"
 while true; do
     while [[ "$role" != "odd" && "$role" != "even" ]]; do
         read -p "Odd (o) or Even (e)? " r
