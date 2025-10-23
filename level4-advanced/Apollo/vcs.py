@@ -272,6 +272,7 @@ def cmd_hash_object(args):
     except FileNotFoundError:
         print(f"File {args.path} not found.", file=sys.stderr)
         sys.exit(1)
+
 def object_hash(fd, fmt, repo=None):
     data = fd.read()
 
@@ -284,7 +285,7 @@ def object_hash(fd, fmt, repo=None):
     else:
         raise Exception("Unknown type %s!" % fmt)
 
-    return object_write(obj, repo)
+    return object_write(obj, repo is not None)
 
 def kvlm_parse(raw, start=0, dct=None):
     if not dct:
