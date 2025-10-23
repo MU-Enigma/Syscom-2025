@@ -257,15 +257,21 @@ argsp.add_argument("-w", dest="write", action="store_true", help="Actually write
 argsp.add_argument("path", help="Read object from <file>")
 
 def cmd_hash_object(args):
-    if args.write:
-        repo = GitRepository(".")
-    else:
-        repo = None
+    try:
+        if args.write:
+            repo = GitRepository(".")
+        else:
+            repo = None
 
-    with open(args.path, "rb") as fd:
-        sha = object_hash(fd, args.type.encode(), repo)
-        print(sha)
-
+        with open(args.path, "rb") as fd:
+            sha = object_hash(fd, args.type.encode(), repo)
+            print(sha)
+    except Exception as e:
+        print(f"Error during hash-object: {e}", file=sys.stderr)
+        sys.exit(1)
+    except FileNotFoundError:
+        print(f"File {args.path} not found.", file=sys.stderr)
+        sys.exit(1)
 def object_hash(fd, fmt, repo=None):
     data = fd.read()
 
