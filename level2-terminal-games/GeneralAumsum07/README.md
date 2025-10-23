@@ -87,6 +87,23 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x pattern_printer.sh     # give permission to execute
 ./pattern_printer.sh            # run the game
 ```
+## 🎮 Game 6: Math Quiz
+
+### 📘 Description
+A short arithmetic quiz that asks random addition, subtraction, or multiplication questions.
+
+### ⚙️ How It Works
+- Player chooses how many questions.
+- Each question is randomly generated using numbers from 1–20.
+- Player types an integer answer; score is tallied.
+
+### 🖥️ How to Run
+```bash
+cd level2-terminal-games/GeneralAumsum07
+chmod +x math_quiz.sh
+./math_quiz.sh
+```
+
 ## 🎮 Game 7: Slot Machine
 
 ### 📘 Description
@@ -105,20 +122,19 @@ cd level2-terminal-games/GeneralAumsum07
 chmod +x slot_machine.sh      # give permission to execute
 ./slot_machine.sh             # run the game
 ```
-## 🎮 Game 9: Stop the Timer
+## 🎮 Game 8: Magic 8-Ball
 
 ### 📘 Description
-A reflex-based mini game. Try to press Enter exactly **10 seconds** after the timer starts!
+Ask any yes/no question and let the mystical 8-Ball decide your fate.
 
 ### ⚙️ How It Works
-- Press Enter to start the timer.  
-- Wait until you think 10 seconds have passed.  
-- Press Enter again to stop the timer.  
-- The game shows how close you were to 10 seconds.
+- Type your question and press Enter.  
+- The 8-Ball responds with a random fortune.  
+- Type **quit** to exit.
 
 ### 🖥️ How to Run
 ```bash
 cd level2-terminal-games/GeneralAumsum07
-chmod +x stop_the_timer.sh
-./stop_the_timer.sh
+chmod +x magic8ball.sh
+./magic8ball.sh
 ```
