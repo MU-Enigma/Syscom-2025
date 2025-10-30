@@ -171,8 +171,6 @@ Display the commit history for the current branch.
 ---
 
 **Happy Coding and Debugging! 🐍**
-<<<<<<< HEAD
-=======
 
 ## Credits
 
@@ -182,4 +180,4 @@ Please see the original repository for reference and attribution:
 - GitHub: https://github.com/SuchirRP/Version_Control-UwUvc
 
 Thank you to SuchirRP for the original implementation and for making this learning exercise possible.
->>>>>>> level_3
+
