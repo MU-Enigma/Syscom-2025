@@ -23,3 +23,12 @@ class UserStorage:
     
     def user_exists(self, username):
         return username in self.users
+    
+    def add_user(self, username, password):
+        if username in self.users:
+            print(f"User '{username}' already exists. Updating password.")
+        else:
+            print(f"Added new user: {username}")
+        
+        self.users[username] = {"password": password}
+        self._save()
