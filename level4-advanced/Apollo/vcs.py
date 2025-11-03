@@ -11,6 +11,7 @@ import sys
 import zlib
 import stat
 import shutil
+from worker import UserStorage
 
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
@@ -39,6 +40,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == 'mkdir'       : cmd_mkdir(args)
     elif args.command == 'chmod'       : cmd_chmod(args)
     elif args.command == "version"     : cmd_version(args)
+    elif args.command == 'encrypt'     : cmd_encrypt(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -967,3 +969,48 @@ def cmd_version(args):
             print(f"Error removing version: {e}", file=sys.stderr)
             sys.exit(1)
 
+argsp = argsubparsers.add_parser("encrypt", help="Encrypt a file in the repository")
+argsp.add_argument("file", help="File to encrypt", required=True)
+
+def cmd_encrypt(args):
+    repo = repo_find()
+    storage = UserStorage()
+
+    def encrypt(text, key):
+        return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
+    
+    if not os.path.exists(args.file):
+        print(f"Error: File {args.file} not found", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        username = str(input("Enter your username: "))
+        count = 3
+
+        while (count > 0):
+            if storage.user_exists(username) == False:
+                key = str(input("New user detected. Set your key: "))
+                storage.add_user(username, key)
+                with open(args.file, 'w') as f:
+                    encrypt(args.file, key)
+                print(f"File {args.file} encrypted successfully for new user {username}.")
+                break
+            elif storage.user_exists(username) == True:
+                key = str(input("Enter your key: "))
+
+                if storage.verify_user(username, key) == True:
+                    with open(args.file, 'w') as f:
+                        encrypt(args.file, key)
+                    print(f"File {args.file} encrypted successfully for user {username}.")
+                    break
+                elif storage.verify_user(username, key) == False:
+                    print(f"Error: Incorrect key! {count-1} tries left!", file=sys.stderr)
+                    count -= 1
+                    continue
+                elif count == 0:
+                    print("Error: Maximum attempts reached. Exiting.....", file=sys.stderr)
+                    sys.exit(1)
+    
+    except Exception as e:
+        print(f"Error during encryption: {e}", file=sys.stderr)
+        sys.exit(1)
