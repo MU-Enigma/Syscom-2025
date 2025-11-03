@@ -41,6 +41,7 @@ def main(argv=sys.argv[1:]):
     elif args.command == 'chmod'       : cmd_chmod(args)
     elif args.command == "version"     : cmd_version(args)
     elif args.command == 'encrypt'     : cmd_encrypt(args)
+    elif args.command == 'decrypt'     : cmd_decrypt(args)
 
 class GitRepository(object):
     """A git repository"""
@@ -1013,4 +1014,45 @@ def cmd_encrypt(args):
     
     except Exception as e:
         print(f"Error during encryption: {e}", file=sys.stderr)
+        sys.exit(1)
+
+argsp = argsubparsers.add_parser("decrypt", help="Decrypt a file in the repository")
+argsp.add_argument("file", help="File to decrypt", required=True)
+
+def cmd_decrypt(args):
+    repo = repo_find()
+    storage = UserStorage()
+
+    def decrypt(text, key):
+        return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
+    
+    if not os.path.exists(args.file):
+        print(f"Error: File {args.file} not found", file=sys.stderr)
+        sys.exit(1)
+
+    try:
+        username = str(input("Enter your username: "))
+        count = 3
+
+        while (count > 0):
+            if storage.user_exists(username) == False:
+                print(f"Error: User '{username}' does not exist!", file=sys.stderr)
+                sys.exit(1)
+            elif storage.user_exists(username) == True:
+                key = str(input("Enter your key: "))
+
+                if storage.verify_user(username, key) == True:
+                    with open(args.file, 'r') as f:
+                        decrypt(args.file, key)
+                    print(f"File {args.file} decrypted successfully for user {username}.")
+                    break
+                elif storage.verify_user(username, key) == False:
+                    print(f"Error: Incorrect key! {count-1} tries left!", file=sys.stderr)
+                    count -= 1
+                    continue
+                elif count == 0:
+                    print("Error: Maximum attempts reached. Exiting.....", file=sys.stderr)
+                    sys.exit(1)
+    except Exception as e:
+        print(f"Error during decryption: {e}", file=sys.stderr)
         sys.exit(1)
