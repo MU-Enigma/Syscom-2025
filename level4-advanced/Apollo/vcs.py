@@ -11,7 +11,7 @@ import sys
 import zlib
 import stat
 import shutil
-from worker import UserStorage
+from user_storage import UserFileStorage
 
 
 argparser = argparse.ArgumentParser(description="The stupid content tracker")
@@ -975,57 +975,84 @@ argsp.add_argument("file", help="File to encrypt", required=True)
 
 def cmd_encrypt(args):
     repo = repo_find()
-    storage = UserStorage()
-
+    storage = UserFileStorage()
+    
     def encrypt(text, key):
         return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
     
+    # Check if file exists
     if not os.path.exists(args.file):
-        print(f"Error: File {args.file} not found", file=sys.stderr)
-        sys.exit(1)
-
+        print(f"Error: File {args.file} not found")
+        return
+    
     try:
-        username = str(input("Enter your username: "))
+        username = input("Enter your username: ")
+        
+        # Check if user exists
+        if not storage.user_exists(username):
+            print(f"Error: User {username} does not exist!")
+            return
+        
+        # Check if file is registered
+        if not storage.get_file_owner(args.file):
+            print(f"File not registered. Registering to {username}...")
+            storage.register_file(args.file, username)
+        
+        # Check if user owns this file
+        if not storage.user_owns_file(username, args.file):
+            owner = storage.get_file_owner(args.file)
+            print(f"ACCESS DENIED: This file belongs to '{owner}', not '{username}'!")
+            return
+        
+        # Check if already encrypted
+        if storage.is_file_encrypted(args.file):
+            print(f"Error: File is already encrypted!")
+            return
+        
+        # Password verification (3 attempts)
         count = 3
-
-        while (count > 0):
-            if storage.user_exists(username) == False:
-                key = str(input("New user detected. Set your key: "))
-                storage.add_user(username, key)
+        while count > 0:
+            key = input("Enter your key: ")
+            
+            if storage.verify_user(username, key):
+                # Read file
+                with open(args.file, 'r') as f:
+                    content = f.read()
+                
+                # Encrypt
+                encrypted = encrypt(content, key)
+                
+                # Save encrypted file
                 with open(args.file, 'w') as f:
-                    encrypt(args.file, key)
-                print(f"File {args.file} encrypted successfully for new user {username}.")
-                break
-            elif storage.user_exists(username) == True:
-                key = str(input("Enter your key: "))
-
-                if storage.verify_user(username, key) == True:
-                    with open(args.file, 'w') as f:
-                        encrypt(args.file, key)
-                    print(f"File {args.file} encrypted successfully for user {username}.")
-                    break
-                elif storage.verify_user(username, key) == False:
-                    print(f"Error: Incorrect key! {count-1} tries left!", file=sys.stderr)
-                    count -= 1
-                    continue
-                elif count == 0:
-                    print("Error: Maximum attempts reached. Exiting.....", file=sys.stderr)
-                    sys.exit(1)
+                    f.write(encrypted)
+                
+                # Mark as encrypted
+                storage.set_file_encrypted(args.file, True)
+                
+                print(f"✓ File {args.file} encrypted successfully!")
+                return
+            else:
+                count -= 1
+                if count > 0:
+                    print(f"Error: Incorrect key! {count} tries left!")
+                else:
+                    print("Error: Maximum attempts reached. Exiting.....")
+                    return
     
     except Exception as e:
-        print(f"Error during encryption: {e}", file=sys.stderr)
-        sys.exit(1)
-
+        print(f"Error during encryption: {e}")
+        return
+    
 argsp = argsubparsers.add_parser("decrypt", help="Decrypt a file in the repository")
 argsp.add_argument("file", help="File to decrypt", required=True)
 
 def cmd_decrypt(args):
     repo = repo_find()
-    storage = UserStorage()
+    storage = UserFileStorage()
 
     def decrypt(text, key):
         return ''.join(chr(ord(c) ^ ord(key[i % len(key)])) for i, c in enumerate(text))
-    
+
     if not os.path.exists(args.file):
         print(f"Error: File {args.file} not found", file=sys.stderr)
         sys.exit(1)
