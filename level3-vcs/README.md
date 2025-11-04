@@ -171,3 +171,13 @@ Display the commit history for the current branch.
 ---
 
 **Happy Coding and Debugging! 🐍**
+
+## Credits
+
+This project (and much of the code in `vcs.py`) was originally developed by SuchirRP.
+Please see the original repository for reference and attribution:
+
+- GitHub: https://github.com/SuchirRP/Version_Control-UwUvc
+
+Thank you to SuchirRP for the original implementation and for making this learning exercise possible.
+
