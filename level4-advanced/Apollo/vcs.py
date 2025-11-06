@@ -924,51 +924,59 @@ def cmd_version(args):
             sys.exit(1)
     
     elif args.mode == "remove":
-        try:
-            if not os.path.exists(version_dir_path):
-                print(f"No versioning directory found for {args.file}", file=sys.stderr)
-                sys.exit(1)
-            
-            # List versions for removal selection
-            version_files = [f for f in os.listdir(version_dir_path) 
-                           if not f.startswith('.')]
-            
-            if not version_files:
-                print(f"No versions found to remove", file=sys.stderr)
-                sys.exit(1)
-            
-            print("Available versions to remove:")
-            for i, vf in enumerate(sorted(version_files), 1):
-                print(f"  {i}. {vf}")
-            print("  a. Remove ALL versions and directory")
-            
+        if args.filename:
+            # Determine the path where this file's versions are stored
+            repo = repo_find()
+            versions_dir = os.path.join(repo.gitdir, "versions", args.filename)
+            if not os.path.exists(versions_dir):
+                print(f"No version history found for {args.filename}")
+                return
+
+            # List available versions
+            versions = sorted(os.listdir(versions_dir))
+            if not versions:
+                print(f"No versions found for {args.filename}")
+                return
+
+            print(f"Available versions for {args.filename}:")
+            for i, v in enumerate(versions, 1):
+                print(f"  {i}. {v}")
+
+            # Prompt user which version to delete
+            choice = input("Enter number of version to delete (or 'q' to cancel): ").strip()
+            if choice.lower() == "q":
+                print("Operation cancelled.")
+                return
+
+            # Validate input
             try:
-                selection = input("Enter version number to remove or 'a' for all: ")
-                
-                if selection.lower() == 'a':
-                    shutil.rmtree(version_dir_path)
-                    print(f"Removed all versions and directory for {args.file}")
-                else:
-                    selection = int(selection) - 1
-                    if 0 <= selection < len(version_files):
-                        file_to_remove = os.path.join(version_dir_path, sorted(version_files)[selection])
-                        os.remove(file_to_remove)
-                        print(f"Removed version: {sorted(version_files)[selection]}")
-                        
-                        # Remove directory if empty
-                        if not os.listdir(version_dir_path):
-                            os.rmdir(version_dir_path)
-                    else:
-                        print("Invalid selection", file=sys.stderr)
-                        sys.exit(1)
-                        
-            except (ValueError, EOFError):
-                print("Invalid input", file=sys.stderr)
-                sys.exit(1)
-                
-        except Exception as e:
-            print(f"Error removing version: {e}", file=sys.stderr)
-            sys.exit(1)
+                idx = int(choice)
+                if idx < 1 or idx > len(versions):
+                    raise ValueError
+            except ValueError:
+                print("Invalid choice.")
+                return
+
+            version_to_delete = versions[idx - 1]
+            version_path = os.path.join(versions_dir, version_to_delete)
+
+            # Confirm before deleting
+            confirm = input(f"Are you sure you want to delete version '{version_to_delete}'? (y/n): ").strip().lower()
+            if confirm != "y":
+                print("Deletion cancelled.")
+                return
+
+            # Perform deletion
+            os.remove(version_path)
+            print(f"✅ Deleted version '{version_to_delete}' of file '{args.filename}'")
+
+            # Optionally remove empty version folder
+            if not os.listdir(versions_dir):
+                os.rmdir(versions_dir)
+                print(f"🧹 Removed empty version folder for '{args.filename}'")
+
+        else:
+            print("Usage: cmd_version --mode remove <filename>")
 
 argsp = argsubparsers.add_parser("encrypt", help="Encrypt a file in the repository")
 argsp.add_argument("file", help="File to encrypt", required=True)
