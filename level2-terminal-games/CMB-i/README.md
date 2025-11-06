@@ -29,6 +29,19 @@ Spin the cylinder, pull the trigger, and hope your luck holds — all safely sim
 - Infinite rounds until the player “loses” or quits
 - Works on any Unix-like terminal (Linux, macOS)
 ---
+## 3. Dice Guessing Game
+
+### About
+A minimal guess-first dice game written in pure Bash. You pick a face (1–6), then the die rolls with a short suspense animation and reveals the result.
+
+### Features
+- Guess before the roll (fair suspense)
+- Clean ASCII dice faces
+- Short rolling animation
+- Score and best-streak tracking
+- Quit anytime with q
+- Runs on any Unix-like terminal (Linux, macOS)
+---
 ## How to Run
 
 ```bash
