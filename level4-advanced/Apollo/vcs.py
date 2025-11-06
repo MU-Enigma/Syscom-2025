@@ -926,7 +926,6 @@ def cmd_version(args):
     elif args.mode == "remove":
         if args.filename:
             # Determine the path where this file's versions are stored
-            repo = repo_find()
             versions_dir = os.path.join(repo.gitdir, "versions", args.filename)
             if not os.path.exists(versions_dir):
                 print(f"No version history found for {args.filename}")
@@ -983,6 +982,10 @@ argsp.add_argument("file", help="File to encrypt", required=True)
 
 def cmd_encrypt(args):
     repo = repo_find()
+    if not repo:
+        print("Error: Not a repository (run `init` first)")
+        return
+
     storage = UserFileStorage()
 
     # Simple XOR function
