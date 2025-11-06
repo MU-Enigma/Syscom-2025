@@ -2,13 +2,13 @@
 **Goal:** Build something interactive in the terminal.
 
 ---
-## Rock–Paper–Scissors
+## 1. Rock–Paper–Scissors
 
-### 🕹️ About
+### About
 A minimal 3-round Rock–Paper–Scissors game written in pure **Bash**.  
 You play against a random CPU opponent.
 
-### ⚙️ Features
+### Features
 - Simple input (`r`, `p`, or `s`)
 - Randomized CPU choice
 - 3 rounds total
@@ -16,7 +16,20 @@ You play against a random CPU opponent.
 - Runs on any Unix-like terminal (Linux, macOS)
 
 ---
-## 🚀 How to Run
+## 2. Russian Roulette
+
+### About
+A suspenseful chance-based terminal game written in pure Bash.
+Spin the cylinder, pull the trigger, and hope your luck holds — all safely simulated with random numbers.
+
+### Features
+- Randomized “bullet” chamber each round
+- Interactive input with Enter or quit option (q)
+- Realistic suspense with timed pauses
+- Infinite rounds until the player “loses” or quits
+- Works on any Unix-like terminal (Linux, macOS)
+---
+## How to Run
 
 ```bash
 # Navigate to the project directory
